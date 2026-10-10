@@ -2,7 +2,7 @@
 
 **A voice-first AI mock interviewer built from your resume, your LinkedIn and the real job posting.** HackRU project.
 
-You upload your resume, your LinkedIn and the job description. An AI interviewer that has read all three calls you. It speaks with a realistic **ElevenLabs** voice and asks the questions this company would actually ask for this role. That includes questions about your own projects and how they connect to the company's mission. You answer out loud. When the call ends you get a coaching report covering:
+Upload your resume, LinkedIn experience, optional portfolio, and a job description. An AI interviewer simulates a hiring manager for that role using the materials you supplied. It speaks with a realistic **ElevenLabs** voice and asks questions about your own projects and how they connect to the company's mission. You answer out loud. When the session ends you get a coaching report covering:
 
 - **STAR breakdown for every answer.** Each Situation, Task, Action and Result is scored, with notes on what worked, what to **elaborate on** and what to **cut**, plus an outline of a stronger retelling.
 - **Tone & confidence.** Uses measured speaking pace (words per minute), long pauses, filler words ("um", "like"…), hedging ("I think", "maybe"), think time before answering, and how often you said "I" vs "we".
@@ -10,6 +10,24 @@ You upload your resume, your LinkedIn and the job description. An AI interviewer
 - **A prioritized improvement plan** with concrete practice drills, plus the next questions to rehearse.
 
 ## How it works
+
+### Interview studio
+
+The interface uses a cream and forest-green workspace with a voice visualization, a guided setup, and dedicated interview, feedback, history, and coaching views. It works on desktop and mobile, supports keyboard navigation, respects reduced motion, and has a print layout for PDF reports.
+
+- **Candidate setup:** upload a resume, add a LinkedIn export or pasted experience, and optionally supply a portfolio URL or project descriptions. Add a public job link or paste the description. Choose behavioral, technical, or mixed practice, 4/6/9 questions, and an interviewer voice. Technical sessions cover spoken reasoning and design; there is no live coding editor.
+- **Live interview:** speak with the mic button, or type. See the current question, elapsed time, and transcript. Repeat a question or skip its audio without adding duplicate transcript entries.
+- **Personal report:** overall score, per-answer STAR analysis, wording improvements, delivery signals, role alignment, and a concrete practice plan. Use **Try this again** to record or type a revised answer and get fresh feedback while the server session remains active.
+- **Practice history:** the last 12 reports and transcripts save in this browser's local storage. View or delete individual reports. Resume and portfolio documents are not saved in browser history. Live scores are summarized separately from demo indicators.
+- **Try a demo:** a four-question simulation using a fictional Rutgers student, sample projects, and a fictional employer, Brightside. No API keys are needed. Browser speech reads the questions; answers are typed unless ElevenLabs is configured. Demo feedback uses clearly labeled keyword checks, not an AI evaluation.
+
+### Feedback limits
+
+Speaking pace and pauses come from ElevenLabs word timestamps. Filler counts and hedging come from the transcript. Tone and confidence are inferred from those signals and wording; pitch, volume, eye contact, and facial expressions are not measured. Typed responses receive wording and structure feedback only. The simulation does not judge technical correctness.
+
+### Validation
+
+`npm test` covers delivery metrics, ingestion, interview length/focus, the complete demo session, empty answers, early endings, and isolated answer retries. It also exercises OpenAI SDK structured parsing, ElevenLabs streaming/transcription, model overrides, concurrent answer rejection, and recovery after provider failure with mocked HTTP responses. Browser checks exercised setup validation, the four-question demo, feedback, retries, persistent history, report deletion, and layouts at 390/768/1024/1440 pixels. Separate smoke checks verified live OpenAI planning, follow-ups, and feedback, plus ElevenLabs speech and Scribe transcription with word timestamps using fictional sample materials. Real provider calls require your API keys.
 
 ```
 Resume PDF ──┐

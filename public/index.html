@@ -1,165 +1,674 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RU Employed — AI Mock Interviewer</title>
-  <meta name="description" content="Practice a real-sounding voice interview built from your resume, LinkedIn and the actual job description, then get STAR-level feedback and an improvement plan." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="RU Employed home">
-      <span class="logo">RU</span><span>Employed</span>
-    </a>
-    <span class="tag">Voice mock interviews · powered by ElevenLabs</span>
-  </header>
-
-  <main>
-    <!-- ============ SETUP ============ -->
-    <section id="view-setup" class="view active">
-      <div class="hero">
-        <h1>Walk into your interview having <em>already done it.</em></h1>
-        <p>Upload your resume, LinkedIn and the job posting. An AI interviewer who has read all three will call you, ask what <strong>this</strong> company would actually ask, and then tell you exactly how to sharpen every story.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#173f35" />
+    <title>RU Employed — Your next interview starts here</title>
+    <meta
+      name="description"
+      content="Practice out loud with an AI interviewer who knows your experience. Get personal feedback and walk into your next interview ready."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <svg
+      class="icon-library"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <symbol id="i-spark" viewBox="0 0 24 24">
+        <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" />
+      </symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="2" />
+        <rect x="14" y="3" width="7" height="7" rx="2" />
+        <rect x="3" y="14" width="7" height="7" rx="2" />
+        <rect x="14" y="14" width="7" height="7" rx="2" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M4 4v16h16M8 14l4-5 4 3 5-7" />
+      </symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24">
+        <path d="M4 12h16m-6-6 6 6-6 6" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path
+          d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"
+        />
+      </symbol>
+      <symbol id="i-file" viewBox="0 0 24 24">
+        <path d="M14 2H5v20h14V7Zm0 0v5h5M8 12h8m-8 4h6" />
+      </symbol>
+      <symbol id="i-link" viewBox="0 0 24 24">
+        <path
+          d="m10 14 4-4m-5 7-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m0 8a4 4 0 0 0 6 0l4-4a4 4 0 0 0-6-6l-1 1"
+        />
+      </symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24">
+        <rect x="9" y="2" width="6" height="13" rx="3" />
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-4 0h8" />
+      </symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24">
+        <path d="M21 11a9 9 0 0 1-9 9H3l1.5-5A9 9 0 1 1 21 11Z" />
+        <path d="M8 10h8m-8 4h5" />
+      </symbol>
+      <symbol id="i-code" viewBox="0 0 24 24">
+        <path d="m7 6-6 6 6 6m10-12 6 6-6 6m-7 3 4-18" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="m5 12 4 4L19 6" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6Z" />
+        <path d="m8 12 3 3 5-6" />
+      </symbol>
+      <symbol id="i-headphones" viewBox="0 0 24 24">
+        <path d="M3 14v-3a9 9 0 0 1 18 0v3" />
+        <rect x="3" y="12" width="4" height="8" rx="2" />
+        <rect x="17" y="12" width="4" height="8" rx="2" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M21 4v6h-6M3 20v-6h6" />
+        <path d="M5 7a8 8 0 0 1 13-2l3 5M3 14l3 5a8 8 0 0 0 13-2" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M6 18 18 6" />
+      </symbol>
+    </svg>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="RU Employed home"
+        ><span class="brand-mark">ru<span>↗</span></span
+        ><span>employed<span class="brand-dot">.</span></span></a
+      >
+      <div class="workspace-label">YOUR PRACTICE SPACE</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <button
+          class="nav-item active"
+          data-view="setup"
+          aria-label="Interview studio"
+        >
+          <svg class="icon"><use href="#i-grid" /></svg> Interview studio
+          <span class="nav-dot"></span>
+        </button>
+        <button
+          class="nav-item"
+          data-view="history"
+          aria-label="Practice history"
+        >
+          <svg class="icon"><use href="#i-clock" /></svg> Practice history
+          <span id="history-count" class="nav-count">0</span>
+        </button>
+        <button
+          class="nav-item"
+          data-view="guide"
+          aria-label="Coaching playbook"
+        >
+          <svg class="icon"><use href="#i-chart" /></svg> Coaching playbook
+        </button>
+      </nav>
+      <div class="sidebar-note">
+        <div class="note-icon">
+          <svg class="icon"><use href="#i-spark" /></svg>
+        </div>
+        <h3>Your next chapter<br />starts with practice.</h3>
+        <p>
+          A safe space to find your voice, tell your story, and show up ready.
+        </p>
+        <span>YOU'VE GOT THIS <span>↗</span></span>
       </div>
-
-      <div id="keys-warning" class="banner hidden"></div>
-
-      <form id="setup-form" class="card setup" autocomplete="off">
-        <div class="grid">
-          <fieldset>
-            <legend><span class="step">1</span> Your resume <span class="req">required</span></legend>
-            <label class="drop" data-for="resumeFile">
-              <input type="file" name="resumeFile" id="resumeFile" accept=".pdf,.txt,.md" />
-              <span class="drop-text">Drop PDF or click to upload</span>
-            </label>
-            <details><summary>or paste text</summary><textarea name="resumeText" rows="6" placeholder="Paste your resume…"></textarea></details>
-          </fieldset>
-
-          <fieldset>
-            <legend><span class="step">2</span> LinkedIn <span class="opt">optional</span></legend>
-            <label class="drop" data-for="linkedinFile">
-              <input type="file" name="linkedinFile" id="linkedinFile" accept=".pdf,.txt,.md" />
-              <span class="drop-text">Drop your LinkedIn PDF</span>
-            </label>
-            <p class="hint">On your LinkedIn profile: <b>More → Save to PDF</b>.</p>
-            <details><summary>or paste your About / Experience</summary><textarea name="linkedinText" rows="6" placeholder="Paste LinkedIn sections…"></textarea></details>
-          </fieldset>
-
-          <fieldset class="wide">
-            <legend><span class="step">3</span> The job <span class="req">required</span></legend>
-            <input type="url" name="jobUrl" placeholder="https://careers.company.com/job/12345" />
-            <details><summary>or paste the job description</summary><textarea name="jobText" rows="6" placeholder="Paste the full job posting…"></textarea></details>
-          </fieldset>
-
-          <fieldset class="wide options">
-            <legend><span class="step">4</span> Interview settings</legend>
-            <div class="row">
-              <label>Focus
-                <select name="focus">
-                  <option value="mixed">Realistic mix</option>
-                  <option value="behavioral">Behavioral / culture fit</option>
-                  <option value="technical">Role & technical experience</option>
-                </select>
-              </label>
-              <label>Length
-                <select name="length">
-                  <option value="short">Quick · 4 questions</option>
-                  <option value="standard" selected>Standard · 6 questions</option>
-                  <option value="long">Full loop · 9 questions</option>
-                </select>
-              </label>
-              <label>Interviewer voice
-                <select name="voiceId" id="voiceId"></select>
-              </label>
+      <div class="sidebar-bottom">
+        <div class="hack-badge">RU</div>
+        <div>
+          <b>Made for your next move</b><span>Built at HackRU · 2026</span>
+        </div>
+      </div>
+    </aside>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="breadcrumb">
+          Your workspace <span>/</span> <b id="page-label">Interview studio</b>
+        </div>
+        <div class="topbar-right">
+          <span class="availability"><i></i> Ready when you are</span
+          ><span class="user-avatar" aria-label="Your practice workspace"
+            >Y</span
+          >
+        </div>
+      </header>
+      <main>
+        <section id="view-setup" class="view active">
+          <div class="page-intro">
+            <div>
+              <span class="eyebrow"
+                ><svg class="icon"><use href="#i-spark" /></svg> BIG
+                OPPORTUNITY. LITTLE PRACTICE.</span
+              >
+              <h1>
+                Make your next interview<br />your <span>best interview.</span>
+              </h1>
+              <p>
+                Real conversations. Personal feedback. A more confident you.
+              </p>
             </div>
-            <label><span>Anything the interviewer should know? <span class="opt">optional</span></span>
-              <input type="text" name="notes" maxlength="500" placeholder="e.g. This is the final round with the hiring manager" />
-            </label>
-          </fieldset>
-        </div>
-
-        <div class="actions">
-          <button type="submit" class="btn primary big" id="start-btn">
-            <span class="btn-label">Start my interview</span>
+            <button class="btn demo-btn" id="demo-btn">
+              <span class="play-icon">▷</span> Try a demo
+              <svg class="icon"><use href="#i-arrow" /></svg>
+            </button>
+          </div>
+          <div class="journey" aria-label="Interview process">
+            <div class="journey-step current">
+              <span>01</span>
+              <div>
+                <b>Make it personal</b><small>Your experience & the role</small>
+              </div>
+            </div>
+            <i></i>
+            <div class="journey-step">
+              <span>02</span>
+              <div>
+                <b>Find your voice</b><small>A conversation, out loud</small>
+              </div>
+            </div>
+            <i></i>
+            <div class="journey-step">
+              <span>03</span>
+              <div>
+                <b>Get better, together</b
+                ><small>Feedback you can act on</small>
+              </div>
+            </div>
+          </div>
+          <div id="keys-warning" class="banner hidden" role="status"></div>
+          <div class="studio-grid">
+            <form id="setup-form" class="setup card" autocomplete="off">
+              <div class="card-heading">
+                <div>
+                  <h2>Let's set the scene</h2>
+                  <p>The more we know, the more personal your interview.</p>
+                </div>
+                <span class="small-badge">ABOUT 2 MIN</span>
+              </div>
+              <fieldset class="form-section">
+                <legend>
+                  <span class="section-number">1</span> Your story
+                  <span class="optional">THE GOOD STUFF</span>
+                </legend>
+                <label class="field-label" for="resumeFile"
+                  >Resume <span class="required-label">Required</span></label
+                >
+                <label class="drop" data-for="resumeFile"
+                  ><input
+                    type="file"
+                    name="resumeFile"
+                    id="resumeFile"
+                    accept=".pdf,.txt,.md" /><span class="upload-icon"
+                    ><svg class="icon"><use href="#i-upload" /></svg></span
+                  ><span
+                    ><b class="drop-text"
+                      >Click to upload <span>or drag and drop</span></b
+                    ><small>PDF, TXT or Markdown · Up to 15 MB</small></span
+                  ><svg class="icon drop-check"><use href="#i-check" /></svg
+                ></label>
+                <details class="paste-option">
+                  <summary>Prefer to paste your resume?</summary>
+                  <label class="sr-only" for="resumeText">Resume text</label
+                  ><textarea
+                    name="resumeText"
+                    id="resumeText"
+                    rows="5"
+                    placeholder="Your education, experience, projects, and achievements…"
+                  ></textarea>
+                </details>
+                <div class="extra-materials">
+                  <details>
+                    <summary>
+                      <svg class="icon"><use href="#i-link" /></svg> Add
+                      LinkedIn <span>Optional +</span>
+                    </summary>
+                    <label class="field-label" for="linkedinFile"
+                      >LinkedIn profile export</label
+                    ><label class="drop compact" data-for="linkedinFile"
+                      ><input
+                        type="file"
+                        name="linkedinFile"
+                        id="linkedinFile"
+                        accept=".pdf,.txt,.md"
+                      /><span class="drop-text"
+                        >Upload your profile PDF</span
+                      ></label
+                    >
+                    <p class="hint">
+                      LinkedIn → More → Save to PDF, or paste your experience
+                      below.
+                    </p>
+                    <label class="sr-only" for="linkedinText"
+                      >LinkedIn experience</label
+                    ><textarea
+                      id="linkedinText"
+                      name="linkedinText"
+                      rows="3"
+                      placeholder="Your About and Experience sections…"
+                    ></textarea>
+                  </details>
+                  <details>
+                    <summary>
+                      <svg class="icon"><use href="#i-link" /></svg> Add a
+                      portfolio <span>Optional +</span>
+                    </summary>
+                    <label class="field-label" for="portfolioUrl"
+                      >Public portfolio link</label
+                    ><input
+                      id="portfolioUrl"
+                      name="portfolioUrl"
+                      type="url"
+                      placeholder="https://your-portfolio.com"
+                    /><label class="field-label" for="portfolioText"
+                      >Or describe your projects</label
+                    ><textarea
+                      id="portfolioText"
+                      name="portfolioText"
+                      rows="3"
+                      placeholder="Project names, your contribution, and results…"
+                    ></textarea>
+                  </details>
+                </div>
+              </fieldset>
+              <fieldset class="form-section">
+                <legend>
+                  <span class="section-number">2</span> Your next opportunity
+                </legend>
+                <label class="field-label" for="jobUrl"
+                  >Job description
+                  <span class="required-label">Required</span></label
+                >
+                <div class="input-with-icon">
+                  <svg class="icon"><use href="#i-link" /></svg
+                  ><input
+                    type="url"
+                    id="jobUrl"
+                    name="jobUrl"
+                    placeholder="Paste a link to the job you're excited about"
+                  />
+                </div>
+                <details class="paste-option">
+                  <summary>Or paste the job description</summary>
+                  <label class="sr-only" for="jobText"
+                    >Job description text</label
+                  ><textarea
+                    id="jobText"
+                    name="jobText"
+                    rows="5"
+                    placeholder="Include the company, role, responsibilities, and requirements…"
+                  ></textarea>
+                </details>
+              </fieldset>
+              <fieldset class="form-section">
+                <legend>
+                  <span class="section-number">3</span> Make it your own
+                </legend>
+                <span class="field-label"
+                  >What would you like to practice?</span
+                >
+                <div class="focus-options">
+                  <label class="focus-card"
+                    ><input type="radio" name="focus" value="behavioral" /><svg
+                      class="icon"
+                    >
+                      <use href="#i-chat" /></svg
+                    ><b>Behavioral</b><span>Your stories & strengths</span
+                    ><i></i></label
+                  ><label class="focus-card"
+                    ><input type="radio" name="focus" value="technical" /><svg
+                      class="icon"
+                    >
+                      <use href="#i-code" /></svg
+                    ><b>Technical</b><span>Your skills & thinking</span
+                    ><i></i></label
+                  ><label class="focus-card"
+                    ><input
+                      type="radio"
+                      name="focus"
+                      value="mixed"
+                      checked /><svg class="icon"><use href="#i-spark" /></svg
+                    ><b>A bit of both</b><span>The full experience</span><i></i
+                  ></label>
+                </div>
+                <div class="settings-row">
+                  <label class="field-label" for="length"
+                    >Session length<select id="length" name="length">
+                      <option value="short">
+                        Quick practice · 4 questions
+                      </option>
+                      <option value="standard" selected>
+                        Standard · 6 questions
+                      </option>
+                      <option value="long">Deep dive · 9 questions</option>
+                    </select></label
+                  ><label class="field-label" for="voiceId"
+                    >Interviewer voice<select name="voiceId" id="voiceId">
+                      <option value="">Rachel · Warm & calm</option>
+                    </select></label
+                  >
+                </div>
+                <details class="paste-option">
+                  <summary>Add a note for your interviewer</summary>
+                  <label class="sr-only" for="notes">Interview notes</label
+                  ><input
+                    type="text"
+                    id="notes"
+                    name="notes"
+                    maxlength="500"
+                    placeholder="e.g. A final round with the engineering manager"
+                  />
+                </details>
+              </fieldset>
+              <div class="form-bottom">
+                <p>
+                  <svg class="icon"><use href="#i-shield" /></svg> Documents are
+                  used for this session. Reports save on your device.
+                </p>
+                <button class="btn primary big" type="submit" id="start-btn">
+                  <svg class="icon"><use href="#i-mic" /></svg
+                  ><span class="btn-label">Meet your interviewer</span
+                  ><svg class="icon"><use href="#i-arrow" /></svg>
+                </button>
+                <p id="setup-error" class="error" role="alert"></p>
+              </div>
+            </form>
+            <aside class="studio-aside">
+              <div class="preview-card">
+                <div class="preview-top">
+                  <span><i></i> YOUR INTERVIEW, REIMAGINED</span
+                  ><svg class="icon"><use href="#i-spark" /></svg>
+                </div>
+                <div class="voice-art" aria-hidden="true">
+                  <div class="orbit orbit-one"></div>
+                  <div class="orbit orbit-two"></div>
+                  <div class="voice-sphere"></div>
+                  <div class="voice-wave">
+                    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+                    ><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+                    ><i></i>
+                  </div>
+                </div>
+                <div class="preview-copy">
+                  <span class="preview-pill"
+                    ><svg class="icon"><use href="#i-mic" /></svg> A REAL VOICE.
+                    A REAL CONVERSATION.</span
+                  >
+                  <h2>Less rehearsal.<br />More ready.</h2>
+                  <p>
+                    An interviewer who knows your story.<br />A coach who helps
+                    you tell it better.
+                  </p>
+                </div>
+                <div class="preview-footer">
+                  <div class="eleven-logo">Ⅱ</div>
+                  <span>Natural voice, powered by <b>ElevenLabs</b></span>
+                </div>
+              </div>
+              <div class="expect-card">
+                <span class="eyebrow">MADE FOR YOUR NEXT YES</span>
+                <h3>A little more than a mock interview.</h3>
+                <div class="expect-item">
+                  <span
+                    ><svg class="icon"><use href="#i-file" /></svg
+                  ></span>
+                  <div>
+                    <b>Questions that know you</b>
+                    <p>Your projects, your experience, their mission.</p>
+                  </div>
+                </div>
+                <div class="expect-item">
+                  <span
+                    ><svg class="icon"><use href="#i-mic" /></svg
+                  ></span>
+                  <div>
+                    <b>Practice the way you'll interview</b>
+                    <p>Speak naturally. Work on pace and delivery.</p>
+                  </div>
+                </div>
+                <div class="expect-item">
+                  <span
+                    ><svg class="icon"><use href="#i-chart" /></svg
+                  ></span>
+                  <div>
+                    <b>Feedback with a next step</b>
+                    <p>Know what worked, what to refine, and try again.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="small-tip">
+                <svg class="icon"><use href="#i-headphones" /></svg>
+                <p>
+                  <b>Set yourself up for a good conversation.</b> Find a quiet
+                  spot, grab your headphones, and be yourself.
+                </p>
+              </div>
+            </aside>
+          </div>
+        </section>
+        <section id="view-loading" class="view">
+          <div class="loading card">
+            <div class="spinner"></div>
+            <span class="eyebrow">GOOD THINGS TAKE A MOMENT</span>
+            <h2 id="loading-title">Getting to know your story…</h2>
+            <p id="loading-sub" class="muted">
+              Building a conversation around your experience.
+            </p>
+          </div>
+        </section>
+        <section id="view-interview" class="view">
+          <div class="interview-intro">
+            <span class="eyebrow">YOUR MOMENT TO PRACTICE</span>
+            <h1>Take a breath. You've got this.</h1>
+            <p class="muted" id="call-format"></p>
+          </div>
+          <div class="call">
+            <div class="call-head">
+              <div>
+                <span class="eyebrow" id="call-company"></span>
+                <h2 id="call-role"></h2>
+              </div>
+              <div class="call-meta">
+                <span id="session-mode" class="live"><i></i> LIVE PRACTICE</span
+                ><span id="call-timer">00:00</span>
+              </div>
+            </div>
+            <div class="call-body">
+              <div class="stage">
+                <div class="orb" id="orb">
+                  <canvas id="viz" width="240" height="240"></canvas
+                  ><span id="interviewer-initial">R</span>
+                </div>
+                <b id="interviewer-name"></b
+                ><span id="interviewer-title" class="muted small"></span
+                ><span class="persona-note"
+                  >AI interviewer · simulated hiring manager</span
+                >
+              </div>
+              <div class="conversation">
+                <div class="question-label">
+                  <span>THE CONVERSATION</span
+                  ><span id="question-progress">Question 1</span>
+                </div>
+                <p id="caption" class="caption"></p>
+                <p id="status" class="status" role="status">Connecting…</p>
+                <div class="controls">
+                  <button
+                    id="mic-btn"
+                    class="mic"
+                    disabled
+                    aria-label="Start answering"
+                  >
+                    <svg class="icon"><use href="#i-mic" /></svg>
+                  </button>
+                  <div id="mic-hint" class="mic-hint">
+                    Tap the mic to begin. Tap again when you're done.
+                  </div>
+                </div>
+                <form id="type-form" class="type-form hidden">
+                  <label class="sr-only" for="type-input">Your answer</label
+                  ><textarea
+                    id="type-input"
+                    rows="4"
+                    placeholder="Tell your story…"
+                  ></textarea
+                  ><button class="btn primary" type="submit">
+                    Send answer <svg class="icon"><use href="#i-arrow" /></svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+            <div class="call-foot">
+              <button class="btn ghost" id="toggle-type">Type instead</button
+              ><button class="btn ghost" id="replay-btn">
+                <svg class="icon"><use href="#i-refresh" /></svg> Repeat
+                question</button
+              ><button class="btn ghost" id="toggle-transcript">
+                <svg class="icon"><use href="#i-chat" /></svg>
+                Transcript</button
+              ><button class="btn danger" id="end-btn">
+                Finish & get feedback
+                <svg class="icon"><use href="#i-arrow" /></svg>
+              </button>
+            </div>
+            <div
+              id="transcript"
+              class="transcript hidden"
+              aria-live="polite"
+            ></div>
+          </div>
+          <p class="call-note">
+            <svg class="icon"><use href="#i-shield" /></svg> This is your
+            practice space. Pause, think, and take your time.
+          </p>
+        </section>
+        <section id="view-report" class="view"><div id="report"></div></section>
+        <section id="view-history" class="view">
+          <div class="page-intro">
+            <div>
+              <span class="eyebrow">EVERY CONVERSATION IS PROGRESS</span>
+              <h1>Your practice history<span>.</span></h1>
+              <p>Revisit your feedback and see how far you've come.</p>
+            </div>
+            <button class="btn primary" data-view="setup">
+              New interview <svg class="icon"><use href="#i-arrow" /></svg>
+            </button>
+          </div>
+          <p class="hint">
+            Reports and transcripts save on this device. Demo scores are marked
+            separately.
+          </p>
+          <div id="history-list"></div>
+        </section>
+        <section id="view-guide" class="view">
+          <div class="page-intro">
+            <div>
+              <span class="eyebrow">SMALL HABITS. BIG DIFFERENCE.</span>
+              <h1>A playbook for your next yes<span>.</span></h1>
+              <p>Three simple ways to make your story land.</p>
+            </div>
+          </div>
+          <div class="guide-grid">
+            <article class="card">
+              <span class="guide-number">01</span>
+              <h2>Give your story a shape.</h2>
+              <p>
+                Use STAR: Situation, Task, Action, Result. Set the scene
+                briefly, explain your responsibility, spend most of your answer
+                on what you did, and finish with the outcome.
+              </p>
+              <div class="drill">
+                <b>Try this:</b> Take one project from your resume. Write one
+                sentence for each part, then tell it out loud without reading.
+              </div>
+            </article>
+            <article class="card">
+              <span class="guide-number">02</span>
+              <h2>Think out loud, clearly.</h2>
+              <p>
+                For technical questions, clarify the constraints, explain your
+                approach, compare alternatives, and discuss how you would test
+                it. Make your reasoning easy to follow.
+              </p>
+              <div class="drill">
+                <b>Try this:</b> Explain a design decision to someone who hasn't
+                seen your code. Include one tradeoff and one failure case.
+              </div>
+            </article>
+            <article class="card">
+              <span class="guide-number">03</span>
+              <h2>Let your words breathe.</h2>
+              <p>
+                A short pause gives you time to think and your listener time to
+                follow. Use a deliberate pause instead of a filler. Say “I” when
+                describing your own contribution.
+              </p>
+              <div class="drill">
+                <b>Try this:</b> Record a 90-second introduction. Listen once
+                for structure and once for pace. Pick one thing to improve.
+              </div>
+            </article>
+          </div>
+          <button class="btn primary" data-view="setup">
+            Put it into practice <svg class="icon"><use href="#i-arrow" /></svg>
           </button>
-          <p class="hint center">Use headphones and a quiet room. You'll be asked for microphone access.</p>
+        </section>
+        <footer class="foot">
+          <span>A little practice goes a long way.</span
+          ><span
+            >Made with purpose at <b>HackRU</b>
+            <span class="footer-flower">✳</span></span
+          >
+        </footer>
+      </main>
+    </div>
+    <dialog id="retry-dialog">
+      <div class="dialog-head">
+        <span class="eyebrow">ANOTHER TAKE. A LITTLE STRONGER.</span
+        ><button
+          id="close-retry"
+          class="icon-button"
+          aria-label="Close answer practice"
+        >
+          <svg class="icon"><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <h2>Give that answer another go.</h2>
+      <p id="retry-question"></p>
+      <p id="retry-tip" class="muted small"></p>
+      <form id="retry-form">
+        <label class="field-label" for="retry-input">Your new response</label
+        ><textarea
+          id="retry-input"
+          rows="6"
+          placeholder="Use the feedback to tell a stronger story…"
+          required
+        ></textarea>
+        <div class="retry-actions">
+          <button id="retry-mic" class="btn" type="button">
+            <svg class="icon"><use href="#i-mic" /></svg> Record answer</button
+          ><button id="retry-submit" class="btn primary" type="submit">
+            Get fresh feedback <svg class="icon"><use href="#i-arrow" /></svg>
+          </button>
         </div>
-        <p id="setup-error" class="error" role="alert"></p>
       </form>
-
-      <div class="how">
-        <div><b>🎙️ All voice</b><span>The interviewer speaks with an ElevenLabs voice. You answer out loud.</span></div>
-        <div><b>📄 It read your resume</b><span>Expect questions about your actual projects and how they fit the company mission.</span></div>
-        <div><b>⭐ STAR-level feedback</b><span>What to expand, what to cut, and how you sounded — then a plan to improve.</span></div>
-      </div>
-    </section>
-
-    <!-- ============ LOADING ============ -->
-    <section id="view-loading" class="view">
-      <div class="card loading">
-        <div class="spinner"></div>
-        <h2 id="loading-title">Reading your resume…</h2>
-        <p id="loading-sub" class="muted">Designing an interview for this exact role.</p>
-      </div>
-    </section>
-
-    <!-- ============ INTERVIEW ============ -->
-    <section id="view-interview" class="view">
-      <div class="call">
-        <div class="call-head">
-          <div>
-            <div class="muted small" id="call-company"></div>
-            <h2 id="call-role"></h2>
-          </div>
-          <div class="call-meta">
-            <span class="live"><i></i> LIVE</span>
-            <span id="call-timer">00:00</span>
-          </div>
-        </div>
-
-        <div class="stage">
-          <div class="person interviewer" id="p-interviewer">
-            <div class="orb" id="orb"><canvas id="viz" width="240" height="240"></canvas><span id="interviewer-initial">A</span></div>
-            <div class="who"><b id="interviewer-name"></b><span id="interviewer-title" class="muted small"></span></div>
-          </div>
-        </div>
-
-        <p id="status" class="status">Connecting…</p>
-        <p id="caption" class="caption"></p>
-
-        <div class="controls">
-          <button id="mic-btn" class="mic" disabled aria-label="Start answering">
-            <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"/></svg>
-          </button>
-          <div class="mic-hint" id="mic-hint">Tap (or press <kbd>Space</kbd>) to answer, tap again when you're done</div>
-        </div>
-
-        <form id="type-form" class="type-form hidden">
-          <textarea id="type-input" rows="3" placeholder="Type your answer…"></textarea>
-          <button class="btn primary" type="submit">Send</button>
-        </form>
-
-        <div class="call-foot">
-          <button class="btn ghost" id="toggle-type">⌨️ Type instead</button>
-          <button class="btn ghost" id="replay-btn">↻ Repeat question</button>
-          <button class="btn ghost" id="toggle-transcript">📝 Transcript</button>
-          <button class="btn danger" id="end-btn">End & get feedback</button>
-        </div>
-
-        <div id="transcript" class="transcript hidden" aria-live="polite"></div>
-      </div>
-    </section>
-
-    <!-- ============ REPORT ============ -->
-    <section id="view-report" class="view">
-      <div id="report"></div>
-    </section>
-  </main>
-
-  <footer class="foot muted small">Built at HackRU · Voice by ElevenLabs · AI interviewer & coach</footer>
-  <script src="app.js" type="module"></script>
-</body>
+      <p id="retry-status" class="muted small" role="status"></p>
+      <div id="retry-result" aria-live="polite"></div>
+    </dialog>
+    <div id="toast" class="toast hidden" role="status"></div>
+    <script src="app.js" type="module"></script>
+  </body>
 </html>
