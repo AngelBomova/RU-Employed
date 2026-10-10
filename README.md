@@ -1,4 +1,4 @@
-# RU Employed 🎙️
+# RU Employed
 
 **A voice-first AI mock interviewer built from your resume, your LinkedIn and the real job posting.** HackRU project.
 
