@@ -12,10 +12,21 @@
   height: 100%;
 }
 #coding-avatar {
-  width: 112px;
-  height: 132px;
+  width: 120px;
+  height: 150px;
   border-radius: 14px;
   flex-shrink: 0;
+}
+.avatar-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: #e2e9e3;
+  color: var(--forest);
+  font-size: 11px;
+  text-align: center;
 }
 #recovery-panel {
   padding: 28px;
@@ -241,13 +252,6 @@ pre {
   display: flex;
   align-items: center;
   gap: 14px;
-}
-#coding-avatar {
-  width: 112px;
-  height: 132px;
-  border-radius: 14px;
-  overflow: hidden;
-  flex-shrink: 0;
 }
 .coding-persona span {
   display: block;
