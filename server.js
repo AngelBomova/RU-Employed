@@ -39,6 +39,7 @@ import {
 import { buildReport } from "./lib/progress.js";
 import { cameraSummary } from "./lib/camera.js";
 import { codingRouter, hasRunner } from "./lib/coding.js";
+import { replaceResume, resolveResume } from "./lib/resume.js";
 import {
   DEMO_MATERIALS,
   demoPlan,
@@ -189,7 +190,7 @@ app.post(
 
     const resume = demo
       ? DEMO_MATERIALS.resume
-      : (await fileText("resumeFile")) || clean(b.resumeText);
+      : await resolveResume(req, req.files?.resumeFile?.[0], b.resumeText);
     const linkedin = demo
       ? DEMO_MATERIALS.linkedin
       : (await fileText("linkedinFile")) || clean(b.linkedinText);
@@ -282,11 +283,41 @@ app.get(
 app.put(
   "/api/profile",
   wrap(async (req, res) => {
-    const materials = {};
+    const saved = await profile(req);
+    const materials = { ...saved };
     for (const key of ["resume", "linkedin", "portfolio", "job", "notes"])
-      materials[key] = clean(req.body[key]);
+      if (Object.hasOwn(req.body, key)) materials[key] = clean(req.body[key]);
+    if (Object.hasOwn(req.body, "resume") && materials.resume !== saved.resume)
+      materials.resumeFilename = "";
     await profile(req, materials);
-    res.json({ ok: true });
+    res.json({ ok: true, materials });
+  }),
+);
+app.put(
+  "/api/profile/resume",
+  (req, _res, next) => {
+    try {
+      requireUser(req);
+      next();
+    } catch (error) {
+      next(error);
+    }
+  },
+  upload.single("resumeFile"),
+  wrap(async (req, res) =>
+    res.json({ materials: await replaceResume(req, req.file) }),
+  ),
+);
+app.delete(
+  "/api/profile/resume",
+  wrap(async (req, res) => {
+    const materials = {
+      ...(await profile(req)),
+      resume: "",
+      resumeFilename: "",
+    };
+    await profile(req, materials);
+    res.json({ materials });
   }),
 );
 

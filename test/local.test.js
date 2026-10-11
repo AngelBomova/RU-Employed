@@ -37,7 +37,10 @@ test("SQLite persists accounts, enforces ownership and leases, and recovery rota
     (e) => e.status === 401,
   );
   const auth = local.localAuthenticate(a.token);
-  local.localProfile(a.user.id, { resume: "private experience" });
+  local.localProfile(a.user.id, {
+    resume: "private experience",
+    resumeFilename: "Alex-resume.pdf",
+  });
   local.localProfile(b.user.id, { resume: "different experience" });
   const id = randomUUID(),
     session = { id, startedAt: Date.now(), turns: [] };
@@ -83,6 +86,7 @@ test("SQLite persists accounts, enforces ownership and leases, and recovery rota
   );
   assert.equal(restarted.name, "Alex");
   assert.equal(restarted.profile.resume, "private experience");
+  assert.equal(restarted.profile.resumeFilename, "Alex-resume.pdf");
   await assert.rejects(
     local.localReset(
       "alex@example.com",

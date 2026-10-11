@@ -146,7 +146,7 @@ async function init() {
       const transfer = new DataTransfer();
       transfer.items.add(e.dataTransfer.files[0]);
       input.files = transfer.files;
-      update();
+      input.dispatchEvent(new Event("change"));
     });
   });
   updateHistoryCount();
@@ -203,6 +203,11 @@ async function startInterview(demo) {
   if (!state.config)
     return ($("#setup-error").textContent =
       "The server is unavailable. Start it and refresh this page.");
+  if (!demo && !(await features.resumeReady())) {
+    $("#setup-error").textContent =
+      "Your resume could not be saved. Try uploading it again.";
+    return;
+  }
   const fd = new FormData($("#setup-form"));
   if (!demo && state.config.accounts && !state.user) {
     show("account");

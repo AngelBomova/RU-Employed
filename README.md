@@ -79,6 +79,7 @@ npm start              # → http://localhost:3000
 
 Open it in Chrome, Edge or Safari, allow microphone access, and use headphones so the interviewer's voice doesn't bleed into your mic.
 
+- **Saved resume:** when signed in, uploading a resume immediately saves its text and filename to your account. It automatically loads for future interviews, including after signing out or restarting the server. Use **Replace** or **Remove** in the interview setup to change it. The original file is not retained; your private saved text powers the interview.
 - **Answering:** the mic stays on and sends your answer after a 1.8-second pause. Tap the mic (or press <kbd>Space</kbd>) to mute/unmute. You can also type an answer.
 - **No ElevenLabs key?** The app still runs. The interviewer uses the browser's built-in voice and you type your answers.
 - **LinkedIn:** on your profile, choose _More → Save to PDF_ and upload that file. You can also paste the sections in.

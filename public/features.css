@@ -2,6 +2,43 @@
   font-size: 12px;
   padding: 7px 14px;
 }
+.saved-resume-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #cbdcc5;
+  border-radius: 12px;
+  background: #f0f5eb;
+}
+.saved-resume-copy {
+  flex: 1 1 170px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.saved-resume-copy b {
+  display: block;
+  font-size: 13px;
+  color: var(--forest);
+}
+.saved-resume-copy span {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.saved-resume-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.saved-resume-actions .text-button {
+  padding: 8px 0;
+}
+#resume-save-status {
+  margin-top: 8px;
+}
 .human-avatar {
   position: relative;
   overflow: hidden;

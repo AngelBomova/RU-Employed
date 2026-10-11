@@ -118,6 +118,98 @@ export function createFeatures(ctx) {
     <section id="view-account" class="view"><div class="page-intro"><div><span class="eyebrow">YOUR STORY. YOUR SPACE.</span><h1 id="account-title">Welcome to your next chapter<span>.</span></h1><p id="account-intro">Sign in to keep your interviews and progress together.</p></div></div><div id="account-notice" class="banner hidden"></div><div id="recovery-panel" class="card hidden"><h2>Save your recovery code</h2><p>This is your way to reset your password offline. Keep it somewhere safe. It is shown only now.</p><pre id="recovery-code" tabindex="0"></pre><button class="btn" id="copy-recovery">Copy code</button><button class="btn primary" id="saved-recovery">I saved it</button></div><div id="auth-panel" class="card auth-card"><div class="auth-tabs"><button type="button" class="btn primary" data-auth-mode="login">Sign in</button><button type="button" class="btn" data-auth-mode="signup">Create an account</button></div><form id="auth-form"><label class="field-label hidden" id="auth-name-label">Your name<input id="auth-name" autocomplete="name" maxlength="80"/></label><label class="field-label">Email address<input id="auth-email" type="email" autocomplete="email" required/></label><label class="field-label" id="auth-password-label">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required/></label><label class="field-label hidden" id="auth-recovery-label">Recovery code<input id="auth-recovery" autocomplete="off" maxlength="100" placeholder="Your saved signup code"/></label><button class="btn primary big" id="auth-submit">Sign in ${icon("arrow")}</button></form><button class="text-button" id="forgot-password">Forgot password?</button><p class="error" id="auth-error" role="alert"></p><p class="hint" id="auth-status" role="status"></p></div><div id="profile-panel" class="hidden account-grid"><form id="account-details" class="card"><h2>Your account</h2><label class="field-label">Your name<input id="profile-name" autocomplete="name" maxlength="80"/></label><label class="field-label">Email address<input id="profile-email" type="email" autocomplete="email" required/></label><label class="field-label">New password <span class="optional">OPTIONAL</span><input id="profile-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="Leave blank to keep your current password"/></label><button class="btn primary">Save account details</button><button class="btn" id="signout" type="button">Sign out</button><p id="profile-status" class="hint" role="status"></p></form><form id="saved-materials" class="card"><h2>Your saved experience</h2><p class="hint">These details are private to your account. Uploads are stored as extracted text, not original files.</p><label class="field-label">Resume<textarea id="saved-resume" rows="5" placeholder="Your experience and achievements…"></textarea></label><label class="field-label">LinkedIn experience<textarea id="saved-linkedin" rows="3"></textarea></label><label class="field-label">Portfolio projects<textarea id="saved-portfolio" rows="3"></textarea></label><div class="coding-actions"><button class="btn primary">Save experience</button><button class="btn" id="use-saved-materials" type="button">Use in next interview</button></div><p id="materials-status" class="hint" role="status"></p></form></div></section>
   `,
   );
+  let savedProfile = {},
+    resumeSaving = null;
+  const resumeDrop = $("#resumeFile").closest(".drop");
+  resumeDrop.insertAdjacentHTML(
+    "afterend",
+    `<div id="saved-resume-card" class="saved-resume-card hidden"><div class="saved-resume-copy"><b id="saved-resume-name"></b><span>Saved to your account · Ready for your next interview</span></div><div class="saved-resume-actions"><button class="btn" type="button" id="replace-resume">Replace</button><button class="text-button" type="button" id="remove-resume">Remove</button></div></div><p id="resume-save-status" class="hint hidden" role="status"></p>`,
+  );
+  $("#saved-resume")
+    .closest("label")
+    .insertAdjacentHTML(
+      "afterend",
+      '<button class="text-button" type="button" id="account-remove-resume">Remove saved resume</button>',
+    );
+
+  function renderResume() {
+    const saved = Boolean(state.user && savedProfile.resume);
+    $("#saved-resume-card").classList.toggle("hidden", !saved);
+    resumeDrop.classList.toggle("hidden", saved);
+    $("#saved-resume-name").textContent =
+      savedProfile.resumeFilename || "Your saved resume";
+    for (const id of [
+      "replace-resume",
+      "remove-resume",
+      "account-remove-resume",
+    ])
+      $("#" + id).disabled = Boolean(resumeSaving) || !saved;
+    $("#resumeFile").disabled = Boolean(resumeSaving);
+  }
+  function applyProfile(materials, fillSetup = true) {
+    savedProfile = materials || {};
+    for (const key of ["resume", "linkedin", "portfolio"])
+      $("#saved-" + key).value = savedProfile[key] || "";
+    if (fillSetup) $("#resumeText").value = savedProfile.resume || "";
+    renderResume();
+  }
+  function resumeStatus(message) {
+    $("#resume-save-status").textContent = message;
+    $("#resume-save-status").classList.toggle("hidden", !message);
+  }
+  async function saveResumeChange(request, success) {
+    if (resumeSaving) return resumeSaving;
+    const userId = state.user?.id;
+    resumeSaving = (async () => {
+      try {
+        const result = await (await request()).json();
+        if (state.user?.id !== userId) return false;
+        applyProfile(result.materials);
+        $("#resumeFile").value = "";
+        $("#resumeFile").dispatchEvent(new Event("change"));
+        resumeStatus(success);
+        $("#materials-status").textContent = success;
+        return true;
+      } catch (error) {
+        $("#resumeFile").value = "";
+        $("#resumeFile").dispatchEvent(new Event("change"));
+        resumeStatus(error.message);
+        toast(error.message);
+        return false;
+      } finally {
+        resumeSaving = null;
+        renderResume();
+      }
+    })();
+    renderResume();
+    return resumeSaving;
+  }
+  $("#resumeFile").addEventListener("change", () => {
+    const file = $("#resumeFile").files[0];
+    if (!state.user || !file || resumeSaving) return;
+    if (file.size > 15 * 1024 * 1024 || !/\.(pdf|txt|md)$/i.test(file.name))
+      return;
+    const body = new FormData();
+    body.set("resumeFile", file);
+    resumeStatus("Saving your resume…");
+    saveResumeChange(
+      () => api("/api/profile/resume", { method: "PUT", body }),
+      "Resume saved. It will be ready whenever you sign in.",
+    );
+  });
+  $("#replace-resume").addEventListener("click", () =>
+    $("#resumeFile").click(),
+  );
+  const removeResume = () => {
+    if (!state.user || resumeSaving) return;
+    resumeStatus("Removing your saved resume…");
+    saveResumeChange(
+      () => api("/api/profile/resume", { method: "DELETE" }),
+      "Saved resume removed. Upload a new one whenever you’re ready.",
+    );
+  };
+  $("#remove-resume").addEventListener("click", removeResume);
+  $("#account-remove-resume").addEventListener("click", removeResume);
   const loadScript = (src) =>
     new Promise((resolve, reject) => {
       const script = document.createElement("script");
@@ -164,11 +256,13 @@ export function createFeatures(ctx) {
       const result = await (await api("/api/reports")).json();
       state.cloudReports = result.reports;
       const profile = await (await api("/api/profile")).json();
-      for (const key of ["resume", "linkedin", "portfolio"])
-        $("#saved-" + key).value = profile.materials[key] || "";
-    } else
-      for (const key of ["resume", "linkedin", "portfolio"])
-        $("#saved-" + key).value = "";
+      applyProfile(profile.materials);
+      if (savedProfile.resume) {
+        $("#resumeFile").value = "";
+        $("#resumeFile").dispatchEvent(new Event("change"));
+      }
+    } else applyProfile({}, Boolean(previous));
+    resumeStatus("");
     $("#account-nav").textContent = state.user
       ? state.user.name || "My account"
       : "Sign in";
@@ -294,6 +388,8 @@ export function createFeatures(ctx) {
     }
   });
   $("#signout").addEventListener("click", async () => {
+    if (resumeSaving)
+      return toast("Wait for your resume change to finish before signing out.");
     if (coding || state.busy || state.recording)
       return toast("Finish your current practice before signing out.");
     try {
@@ -346,15 +442,19 @@ export function createFeatures(ctx) {
     e.preventDefault();
     e.submitter.disabled = true;
     try {
-      await api("/api/profile", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          resume: $("#saved-resume").value,
-          linkedin: $("#saved-linkedin").value,
-          portfolio: $("#saved-portfolio").value,
-        }),
-      });
+      if (resumeSaving && !(await resumeSaving)) return;
+      const result = await (
+        await api("/api/profile", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            resume: $("#saved-resume").value,
+            linkedin: $("#saved-linkedin").value,
+            portfolio: $("#saved-portfolio").value,
+          }),
+        })
+      ).json();
+      applyProfile(result.materials);
       $("#materials-status").textContent =
         "Your experience is saved privately.";
     } catch (error) {
@@ -1034,6 +1134,7 @@ export function createFeatures(ctx) {
     $("#" + id).addEventListener("change", progress),
   );
   return {
+    resumeReady: async () => (resumeSaving ? await resumeSaving : true),
     async init(config) {
       voices();
       account();
