@@ -110,4 +110,4 @@ test/               Unit tests (npm test)
 - Active sessions expire after 3 hours. Authenticated sessions persist in SQLite or Supabase with request leases; guest sessions use isolated process memory. Production requires an HTTPS origin and either Supabase or explicit local mode with a persistent database path. See the deployment guide for shared rate limiting and scaling considerations.
 - A transcript doesn't capture vocal pitch, so "tone" is inferred from pacing, pauses, fillers, hedging and word choice. The report says this.
 - On Claude, requests use the server-side refusal fallback (`fallbacks: "default"`), so a false-positive safety decline doesn't end an interview partway through.
-- **Keys stay private:** `.env` (and an `env/` folder, if you prefer to keep it there) are in `.gitignore`, so they never get committed.
+- **Keys stay private:** `.env` (and an `env/` folder, if you prefer to keep it there) are in `.gitignore`, so they never get committed.   
