@@ -1,4 +1,6 @@
-import { avatarSvg } from "./avatar.js";
+import { createAvatar3D } from "./avatar-3d.js";
+import { createContinuousMic } from "./continuous-mic.js";
+import { createCameraCoach } from "./camera-coach.js";
 import { analyzeProgress, metricsFor, CATEGORY_LABELS } from "./analytics.js";
 
 export function createFeatures(ctx) {
@@ -29,6 +31,42 @@ export function createFeatures(ctx) {
     codingRecorder = null,
     codingSpeechGeneration = 0;
   const drafts = {};
+  const listHtml = (items) =>
+    "<ul>" +
+    items.map((item) => "<li>" + esc(item) + "</li>").join("") +
+    "</ul>";
+  let videoAvatar,
+    codeAvatar,
+    codeVoicing = false,
+    codeFinishAfterAnswer = false,
+    codePending = null;
+  const coach = createCameraCoach((text) => {
+    $("#camera-coach-status").textContent = text;
+  });
+  const codeMic = createContinuousMic({
+    canListen: () => !!coding && !codingBusy && !codingSpeaking && !codePending,
+    onState: ({ muted, speaking }) => {
+      codeVoicing = speaking;
+      $("#coding-mic").textContent = muted
+        ? "Unmute microphone"
+        : "Mute microphone";
+      $("#coding-mic").setAttribute("aria-pressed", String(muted));
+      if (speaking)
+        $("#coding-status").textContent =
+          "Listening to your explanation… pause to send.";
+    },
+    onAnswer: async (blob) => {
+      const body = new FormData();
+      body.set(
+        "audio",
+        blob,
+        "explanation." + (blob.type.includes("mp4") ? "m4a" : "webm"),
+      );
+      for (const [k, v] of Object.entries(codePayload())) body.set(k, v);
+      await explain(body);
+    },
+    onError: (error) => toast(error.message),
+  });
   $(".side-nav").insertAdjacentHTML(
     "beforeend",
     `<button class="nav-item" data-view="coding" aria-label="Coding room">${icon("code")} Coding room</button><button class="nav-item" data-view="progress" aria-label="Your progress">${icon("chart")} Your progress</button>`,
@@ -39,8 +77,21 @@ export function createFeatures(ctx) {
   );
   $("#setup-form .settings-row").insertAdjacentHTML(
     "afterend",
-    `<div class="settings-row"><label class="field-label" for="interviewStyle">Interview space<select name="interviewStyle" id="interviewStyle"><option value="voice">Voice studio</option><option value="video">Face-to-face</option></select></label><label class="field-label" for="gender">AI interviewer<select name="gender" id="gender"><option value="female">Female interviewer</option><option value="male">Male interviewer</option></select></label></div><label class="camera-consent"><input type="checkbox" id="enable-camera" name="enableCamera" value="true"/> Enable my webcam for face-to-face practice</label><p class="hint">Your camera stays on this device. No video is uploaded or analyzed.</p>`,
+    `<div class="settings-row"><label class="field-label" for="interviewStyle">Interview space<select name="interviewStyle" id="interviewStyle"><option value="voice">Voice studio</option><option value="video">Face-to-face</option></select></label><label class="field-label" for="gender">AI interviewer<select name="gender" id="gender"><option value="female">Female interviewer</option><option value="male">Male interviewer</option></select></label></div><label class="camera-consent"><input type="checkbox" id="enable-camera" name="enableCamera" value="true"/> Enable my webcam for face-to-face practice</label><p class="hint">Your camera stays on this device. No video is uploaded. Optional coaching analyzes landmarks locally.</p><label class="camera-consent"><input type="checkbox" id="analyze-camera" name="analyzeCamera" value="true"/> Review camera-facing direction, framing, and facial movement</label><p class="hint" id="camera-coach-status">Webcam coaching is optional. Facial movement does not measure emotion or confidence.</p>`,
   );
+  $("#setup-form .settings-row").insertAdjacentHTML(
+    "afterend",
+    '<label class="field-label" id="technical-format-label">Technical interview format<select id="technical-format" name="technicalFormat"><option value="coding">Live coding · editor and spoken explanation</option><option value="conversation">Spoken technical questions</option><option value="system-design">System design discussion</option></select></label>',
+  );
+  const updateFormat = () =>
+    $("#technical-format-label").classList.toggle(
+      "hidden",
+      new FormData($("#setup-form")).get("focus") !== "technical",
+    );
+  document
+    .querySelectorAll('[name="focus"]')
+    .forEach((input) => input.addEventListener("change", updateFormat));
+  updateFormat();
   const stage = $("#view-interview .stage");
   const participants = document.createElement("div");
   participants.className = "video-participants hidden";
@@ -64,7 +115,7 @@ export function createFeatures(ctx) {
       .join(
         "",
       )}</select></label></div><div id="progress-stats" class="stats"></div><div class="card chart-card"><div class="card-heading"><div><h2>Your practice, over time</h2><p>Hover for details. Select a point to open that interview.</p></div><span class="small-badge">LIVE INTERVIEWS</span></div><div class="chart-container"><canvas id="progress-chart" role="img" aria-label="Interview performance over time"></canvas><p id="chart-empty" class="hidden">Finish a live interview to start your progress chart.</p></div><p class="hint">Demos are excluded. Gaps mean a category was not assessed. Confidence is inferred from available evidence, never a direct vocal measurement.</p></div><div id="progress-comparison" class="card comparison-card"></div><div id="progress-history"></div></section>
-    <section id="view-account" class="view"><div class="page-intro"><div><span class="eyebrow">YOUR STORY. YOUR SPACE.</span><h1 id="account-title">Welcome to your next chapter<span>.</span></h1><p id="account-intro">Sign in to keep your interviews and progress together.</p></div></div><div id="account-notice" class="banner hidden"></div><div id="auth-panel" class="card auth-card"><div class="auth-tabs"><button type="button" class="btn primary" data-auth-mode="login">Sign in</button><button type="button" class="btn" data-auth-mode="signup">Create an account</button></div><form id="auth-form"><label class="field-label hidden" id="auth-name-label">Your name<input id="auth-name" autocomplete="name" maxlength="80"/></label><label class="field-label">Email address<input id="auth-email" type="email" autocomplete="email" required/></label><label class="field-label" id="auth-password-label">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required/></label><button class="btn primary big" id="auth-submit">Sign in ${icon("arrow")}</button></form><button class="text-button" id="forgot-password">Forgot password?</button><p class="error" id="auth-error" role="alert"></p><p class="hint" id="auth-status" role="status"></p></div><div id="profile-panel" class="hidden account-grid"><form id="account-details" class="card"><h2>Your account</h2><label class="field-label">Your name<input id="profile-name" autocomplete="name" maxlength="80"/></label><label class="field-label">Email address<input id="profile-email" type="email" autocomplete="email" required/></label><label class="field-label">New password <span class="optional">OPTIONAL</span><input id="profile-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="Leave blank to keep your current password"/></label><button class="btn primary">Save account details</button><button class="btn" id="signout" type="button">Sign out</button><p id="profile-status" class="hint" role="status"></p></form><form id="saved-materials" class="card"><h2>Your saved experience</h2><p class="hint">These details are private to your account. Uploads are stored as extracted text, not original files.</p><label class="field-label">Resume<textarea id="saved-resume" rows="5" placeholder="Your experience and achievements…"></textarea></label><label class="field-label">LinkedIn experience<textarea id="saved-linkedin" rows="3"></textarea></label><label class="field-label">Portfolio projects<textarea id="saved-portfolio" rows="3"></textarea></label><div class="coding-actions"><button class="btn primary">Save experience</button><button class="btn" id="use-saved-materials" type="button">Use in next interview</button></div><p id="materials-status" class="hint" role="status"></p></form></div></section>
+    <section id="view-account" class="view"><div class="page-intro"><div><span class="eyebrow">YOUR STORY. YOUR SPACE.</span><h1 id="account-title">Welcome to your next chapter<span>.</span></h1><p id="account-intro">Sign in to keep your interviews and progress together.</p></div></div><div id="account-notice" class="banner hidden"></div><div id="recovery-panel" class="card hidden"><h2>Save your recovery code</h2><p>This is your way to reset your password offline. Keep it somewhere safe. It is shown only now.</p><pre id="recovery-code" tabindex="0"></pre><button class="btn" id="copy-recovery">Copy code</button><button class="btn primary" id="saved-recovery">I saved it</button></div><div id="auth-panel" class="card auth-card"><div class="auth-tabs"><button type="button" class="btn primary" data-auth-mode="login">Sign in</button><button type="button" class="btn" data-auth-mode="signup">Create an account</button></div><form id="auth-form"><label class="field-label hidden" id="auth-name-label">Your name<input id="auth-name" autocomplete="name" maxlength="80"/></label><label class="field-label">Email address<input id="auth-email" type="email" autocomplete="email" required/></label><label class="field-label" id="auth-password-label">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required/></label><label class="field-label hidden" id="auth-recovery-label">Recovery code<input id="auth-recovery" autocomplete="off" maxlength="100" placeholder="Your saved signup code"/></label><button class="btn primary big" id="auth-submit">Sign in ${icon("arrow")}</button></form><button class="text-button" id="forgot-password">Forgot password?</button><p class="error" id="auth-error" role="alert"></p><p class="hint" id="auth-status" role="status"></p></div><div id="profile-panel" class="hidden account-grid"><form id="account-details" class="card"><h2>Your account</h2><label class="field-label">Your name<input id="profile-name" autocomplete="name" maxlength="80"/></label><label class="field-label">Email address<input id="profile-email" type="email" autocomplete="email" required/></label><label class="field-label">New password <span class="optional">OPTIONAL</span><input id="profile-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="Leave blank to keep your current password"/></label><button class="btn primary">Save account details</button><button class="btn" id="signout" type="button">Sign out</button><p id="profile-status" class="hint" role="status"></p></form><form id="saved-materials" class="card"><h2>Your saved experience</h2><p class="hint">These details are private to your account. Uploads are stored as extracted text, not original files.</p><label class="field-label">Resume<textarea id="saved-resume" rows="5" placeholder="Your experience and achievements…"></textarea></label><label class="field-label">LinkedIn experience<textarea id="saved-linkedin" rows="3"></textarea></label><label class="field-label">Portfolio projects<textarea id="saved-portfolio" rows="3"></textarea></label><div class="coding-actions"><button class="btn primary">Save experience</button><button class="btn" id="use-saved-materials" type="button">Use in next interview</button></div><p id="materials-status" class="hint" role="status"></p></form></div></section>
   `,
   );
   const loadScript = (src) =>
@@ -84,12 +135,19 @@ export function createFeatures(ctx) {
   function mode(next) {
     authMode = next;
     $("#auth-name-label").classList.toggle("hidden", next !== "signup");
-    $("#auth-password-label").classList.toggle("hidden", next === "forgot");
-    $("#auth-password").required = next !== "forgot";
+    const offlineReset =
+      next === "forgot" && state.config?.authMode === "local";
+    $("#auth-recovery-label").classList.toggle("hidden", !offlineReset);
+    $("#auth-recovery").required = offlineReset;
+    $("#auth-password-label").classList.toggle(
+      "hidden",
+      next === "forgot" && !offlineReset,
+    );
+    $("#auth-password").required = next !== "forgot" || offlineReset;
     $("#auth-password").autocomplete =
-      next === "signup" ? "new-password" : "current-password";
+      next === "signup" || offlineReset ? "new-password" : "current-password";
     $("#auth-submit").innerHTML =
-      `${next === "forgot" ? "Send reset link" : next === "signup" ? "Create account" : "Sign in"} ${icon("arrow")}`;
+      `${next === "forgot" ? (offlineReset ? "Reset password" : "Send reset link") : next === "signup" ? "Create account" : "Sign in"} ${icon("arrow")}`;
     document
       .querySelectorAll("[data-auth-mode]")
       .forEach((b) =>
@@ -119,15 +177,22 @@ export function createFeatures(ctx) {
       "Y")[0].toUpperCase();
     $("#view-history > .hint").textContent = state.user
       ? "Private reports saved to your account. Demo indicators are excluded from progress."
-      : "Reports and transcripts save on this device. Sign in to save across devices.";
+      : state.config?.authMode === "local"
+        ? "Guest reports save in this browser. Sign in to keep private reports on this computer."
+        : "Reports and transcripts save on this device. Sign in to save across devices.";
     updateHistoryCount();
     account();
   }
   function account() {
     const enabled = !!state.config?.accounts;
-    $("#account-notice").classList.toggle("hidden", enabled);
+    $("#account-notice").classList.toggle(
+      "hidden",
+      enabled && state.config?.authMode !== "local",
+    );
     $("#account-notice").textContent =
-      "Cloud accounts are not connected in this workspace yet. You can still practice as a guest and keep reports on this device.";
+      state.config?.authMode === "local"
+        ? "Local accounts save privately in SQLite on this computer. Password resets use your recovery code; no email service is needed."
+        : "Accounts are unavailable. You can still explore a demo.";
     $("#auth-panel").classList.toggle("hidden", !!state.user);
     $("#profile-panel").classList.toggle("hidden", !state.user);
     $("#auth-submit").disabled = !enabled;
@@ -157,20 +222,29 @@ export function createFeatures(ctx) {
     $("#auth-submit").disabled = true;
     try {
       const result = await (
-        await api(`/api/auth/${authMode}`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            name: $("#auth-name").value,
-            email: $("#auth-email").value,
-            password: $("#auth-password").value,
-          }),
-        })
+        await api(
+          `/api/auth/${authMode === "forgot" && state.config?.authMode === "local" ? "reset" : authMode}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              recoveryCode: $("#auth-recovery").value,
+              name: $("#auth-name").value,
+              email: $("#auth-email").value,
+              password: $("#auth-password").value,
+            }),
+          },
+        )
       ).json();
       $("#auth-password").value = "";
       $("#auth-status").textContent = result.message || "Signed in.";
       await refreshAccount();
-      if (state.user) {
+      $("#auth-recovery").value = "";
+      if (result.recoveryCode) {
+        $("#recovery-code").textContent = result.recoveryCode;
+        $("#recovery-panel").classList.remove("hidden");
+        show("account");
+      } else if (state.user) {
         show("progress");
         toast("Welcome to your private workspace.");
       }
@@ -179,6 +253,19 @@ export function createFeatures(ctx) {
     } finally {
       $("#auth-submit").disabled = !state.config?.accounts;
     }
+  });
+  $("#copy-recovery").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("#recovery-code").textContent);
+      toast("Recovery code copied.");
+    } catch {
+      toast("Select the recovery code and copy it manually.");
+    }
+  });
+  $("#saved-recovery").addEventListener("click", () => {
+    $("#recovery-code").textContent = "";
+    $("#recovery-panel").classList.add("hidden");
+    show("progress");
   });
   $("#account-details").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -232,6 +319,7 @@ export function createFeatures(ctx) {
         "auth-email",
         "auth-name",
         "auth-password",
+        "auth-recovery",
         "type-input",
         "code-explanation",
       ]) {
@@ -242,12 +330,14 @@ export function createFeatures(ctx) {
       state.plan = null;
       state.sessionId = null;
       editor?.setValue("");
+      $("#recovery-code").textContent = "";
+      $("#recovery-panel").classList.add("hidden");
       state.user = null;
       state.cloudReports = [];
       state.report = null;
       await refreshAccount();
       show("setup");
-      toast("Signed out. Your cloud reports remain private.");
+      toast("Signed out. Your account reports remain private.");
     } catch (error) {
       toast(error.message);
     }
@@ -314,8 +404,18 @@ export function createFeatures(ctx) {
     $("#user-video").srcObject = camera;
     $("#camera-placeholder").classList.add("hidden");
     $("#camera-btn").textContent = "Turn camera off";
+    if ($("#analyze-camera").checked)
+      await coach.start(
+        $("#user-video"),
+        () =>
+          !state.speaking &&
+          !state.busy &&
+          !state.ended &&
+          $("#view-interview").classList.contains("active"),
+      );
   }
   function stopCamera() {
+    coach.stop();
     camera?.getTracks().forEach((t) => t.stop());
     camera = null;
     $("#user-video").srcObject = null;
@@ -335,24 +435,7 @@ export function createFeatures(ctx) {
       }
     }
   });
-  $("#mute-btn").addEventListener("click", async () => {
-    if (state.recording)
-      return toast("Stop and send your answer before muting.");
-    try {
-      const stream = await getMic();
-      const enabled = !stream.getAudioTracks()[0].enabled;
-      stream.getAudioTracks().forEach((t) => {
-        t.enabled = enabled;
-      });
-      $("#mute-btn").textContent = enabled
-        ? "Mute microphone"
-        : "Unmute microphone";
-      $("#mic-btn").disabled =
-        !enabled || state.busy || state.speaking || state.ended;
-    } catch (error) {
-      toast(error.message);
-    }
-  });
+  $("#mute-btn").addEventListener("click", () => ctx.toggleMute());
   async function ensureEditor() {
     if (editor) return editor;
     editorReady ??= loadScript("/vendor/monaco/vs/loader.js").then(
@@ -411,6 +494,8 @@ export function createFeatures(ctx) {
     const generation = ++codingSpeechGeneration;
     $("#coding-caption").textContent = text;
     codingSpeaking = true;
+    codeMic.pause();
+    codeAvatar?.speaking(true);
     updateCodingControls();
     try {
       if (state.config?.elevenlabs) {
@@ -432,19 +517,22 @@ export function createFeatures(ctx) {
     } finally {
       if (generation === codingSpeechGeneration) {
         codingSpeaking = false;
+        codeAvatar?.speaking(false);
         updateCodingControls();
       }
     }
   }
   function updateCodingControls() {
     $("#run-code").disabled =
-      codingBusy || !state.config?.coding?.runner || !coding;
+      codingBusy ||
+      (!state.config?.coding?.runner &&
+        $("#code-language").value !== "javascript") ||
+      !coding;
     $("#finish-coding").disabled = $("#leave-coding").disabled =
       codingBusy || codingRecorder?.state === "recording";
     $("#send-code-explanation").disabled =
       codingBusy || codingSpeaking || codingRecorder?.state === "recording";
-    $("#coding-mic").disabled =
-      codingBusy || codingSpeaking || !state.config?.elevenlabs;
+    $("#coding-mic").disabled = !state.config?.elevenlabs || !coding;
     $("#code-language").disabled = codingBusy;
   }
   function codePayload() {
@@ -453,7 +541,7 @@ export function createFeatures(ctx) {
       language: $("#code-language").value,
     };
   }
-  async function startCoding(isDemo) {
+  async function startCoding(isDemo, materials = null) {
     if (codingBusy || coding) return;
     audio.unlock();
     if (!isDemo && state.config?.accounts && !state.user) {
@@ -461,21 +549,34 @@ export function createFeatures(ctx) {
       return toast("Sign in to save and start a private coding interview.");
     }
     codingBusy = true;
+    codePending = null;
+    codeFinishAfterAnswer = false;
     $("#generate-coding").disabled = $("#demo-coding").disabled = true;
     $("#coding-setup-error").textContent = "Preparing your problem and editor…";
     try {
       await ensureEditor();
+      const requestBody =
+        materials instanceof FormData ? materials : { materials };
+      const options = {
+        demo: isDemo,
+        company: $("#coding-company").value,
+        role: $("#coding-role").value,
+        difficulty: $("#coding-difficulty").value,
+        voiceId: $("#voiceId").value,
+      };
+      if (requestBody instanceof FormData)
+        for (const [key, value] of Object.entries(options))
+          requestBody.set(key, String(value));
+      else Object.assign(requestBody, options);
       coding = await (
         await api("/api/coding/sessions", {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            demo: isDemo,
-            company: $("#coding-company").value,
-            role: $("#coding-role").value,
-            difficulty: $("#coding-difficulty").value,
-            voiceId: $("#voiceId").value,
-          }),
+          ...(requestBody instanceof FormData
+            ? { body: requestBody }
+            : {
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(requestBody),
+              }),
         })
       ).json();
       Object.keys(drafts).forEach((key) => delete drafts[key]);
@@ -500,12 +601,17 @@ export function createFeatures(ctx) {
       $("#coding-validation").textContent = coding.referenceVerified
         ? "Reference solution validated by the sandbox."
         : "Reference solution has not been executed.";
-      $("#coding-avatar").innerHTML = avatarSvg($("#gender").value);
+      codeAvatar?.dispose();
+      codeAvatar = createAvatar3D($("#coding-avatar"), $("#gender").value);
       $("#coding-interviewer-name").textContent = coding.plan.interviewer.name;
+      $("#runner-note").textContent =
+        "JavaScript runs locally in an isolated sandbox. Python, Java and C++ need a connected Judge0 service.";
       $("#runner-note").classList.toggle(
         "hidden",
         !!state.config?.coding?.runner,
       );
+      if (!state.config?.coding?.runner)
+        $("#code-language").value = "javascript";
       $("#coding-mic").classList.toggle("hidden", !state.config?.elevenlabs);
       $("#code-results").innerHTML = "";
       $("#coding-transcript").innerHTML = "";
@@ -515,6 +621,13 @@ export function createFeatures(ctx) {
       codingBusy = false;
       updateCodingControls();
       $("#coding-setup-error").textContent = "";
+      if (state.config?.elevenlabs) {
+        try {
+          await codeMic.start(await getMic());
+        } catch (error) {
+          toast(error.message);
+        }
+      }
       await codingSpeak(coding.reply);
     } catch (error) {
       $("#coding-setup-error").textContent = error.message;
@@ -533,6 +646,7 @@ export function createFeatures(ctx) {
     if (!coding || !editor) return;
     const language = $("#code-language").value;
     window.monaco.editor.setModelLanguage(editor.getModel(), language);
+    updateCodingControls();
     editor.setValue(drafts[language] ?? coding.problem.starter[language]);
   });
   $("#run-code").addEventListener("click", async () => {
@@ -565,6 +679,8 @@ export function createFeatures(ctx) {
   });
   async function explain(body) {
     if (!coding || codingBusy || codingSpeaking) return;
+    codeMic.pause();
+    codePending = body;
     codingBusy = true;
     updateCodingControls();
     $("#coding-status").textContent =
@@ -576,6 +692,7 @@ export function createFeatures(ctx) {
           body,
         })
       ).json();
+      codePending = null;
       $("#code-explanation").value = "";
       $("#coding-transcript").insertAdjacentHTML(
         "beforeend",
@@ -583,10 +700,17 @@ export function createFeatures(ctx) {
       );
       $("#coding-status").textContent = "Your next follow-up is ready.";
       codingBusy = false;
+      if (codeFinishAfterAnswer) {
+        codeFinishAfterAnswer = false;
+        await finishCoding();
+        return;
+      }
       await codingSpeak(result.reply);
       if (result.ended) await finishCoding();
     } catch (error) {
-      $("#coding-status").textContent = error.message;
+      $("#coding-status").textContent =
+        error.message +
+        " Your recording is preserved. Click Discuss my code to retry.";
     } finally {
       codingBusy = false;
       updateCodingControls();
@@ -595,6 +719,7 @@ export function createFeatures(ctx) {
   $("#code-explanation-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const text = $("#code-explanation").value.trim();
+    if (!text && codePending) return explain(codePending);
     if (!text) return toast("Explain your approach or ask a question.");
     const body = new FormData();
     for (const [key, value] of Object.entries({ ...codePayload(), text }))
@@ -602,48 +727,9 @@ export function createFeatures(ctx) {
     explain(body);
   });
   $("#coding-mic").addEventListener("click", async () => {
-    if (codingRecorder?.state === "recording") {
-      codingRecorder.stop();
-      return;
-    }
     try {
-      const stream = await getMic(),
-        chunks = [],
-        mime = ["audio/webm;codecs=opus", "audio/mp4", "audio/webm"].find((x) =>
-          MediaRecorder.isTypeSupported(x),
-        );
-      const recorder = new MediaRecorder(
-        stream,
-        mime ? { mimeType: mime } : {},
-      );
-      codingRecorder = recorder;
-      recorder.onerror = () => {
-        releaseMic();
-        codingRecorder = null;
-        toast("Recording failed. Please type your explanation or try again.");
-        updateCodingControls();
-      };
-      recorder.ondataavailable = (e) => {
-        if (e.data.size) chunks.push(e.data);
-      };
-      recorder.onstop = () => {
-        const body = new FormData(),
-          type = recorder.mimeType || "audio/webm";
-        body.set(
-          "audio",
-          new Blob(chunks, { type }),
-          `explanation.${type.includes("mp4") ? "m4a" : "webm"}`,
-        );
-        for (const [key, value] of Object.entries(codePayload()))
-          body.set(key, value);
-        releaseMic();
-        $("#coding-mic").innerHTML = `${icon("mic")} Record explanation`;
-        explain(body);
-      };
-      recorder.start(250);
-      $("#coding-mic").textContent = "Stop & send";
-      $("#coding-status").textContent = "Recording your explanation…";
-      updateCodingControls();
+      if (!state.stream) await codeMic.start(await getMic());
+      else codeMic.toggleMute();
     } catch (error) {
       toast(error.message);
     }
@@ -655,7 +741,21 @@ export function createFeatures(ctx) {
     updateCodingControls();
   });
   async function finishCoding() {
-    if (!coding || codingBusy || codingRecorder?.state === "recording") return;
+    if (!coding || codingBusy) return;
+    if (codeVoicing) {
+      codeFinishAfterAnswer = true;
+      codeMic.flush();
+      return;
+    }
+    if (codePending)
+      return toast(
+        "Retry your saved explanation with Discuss my code before finishing.",
+      );
+    if (!coding.demo && !$("#coding-transcript").textContent.trim())
+      return toast(
+        "Talk through your solution or type an explanation before finishing.",
+      );
+    codeMic.pause();
     codingBusy = true;
     codingSpeechGeneration++;
     codingSpeaking = false;
@@ -670,9 +770,13 @@ export function createFeatures(ctx) {
           body: JSON.stringify(codePayload()),
         })
       ).json();
+      codeMic.stop();
+      codeAvatar?.dispose();
+      codeAvatar = null;
       releaseMic();
       saveReport(report);
       renderReport(report);
+      codePending = null;
       coding = null;
       $("#coding-workspace").classList.add("hidden");
       $("#coding-setup").classList.remove("hidden");
@@ -691,6 +795,7 @@ export function createFeatures(ctx) {
     codingSpeechGeneration++;
     codingSpeaking = false;
     audio.interrupt();
+    codeMic.stop();
     releaseMic();
     updateCodingControls();
     try {
@@ -708,6 +813,56 @@ export function createFeatures(ctx) {
     }
   });
   function enhanceReport(report) {
+    const v = report.camera;
+    if (v) {
+      const pct = (x) => (x === null ? "—" : Math.round(x * 100) + "%");
+      const tips = [];
+      if (v.faceVisible < 0.8)
+        tips.push("Keep your face visible and add light in front of you.");
+      if (v.cameraFacing !== null && v.cameraFacing < 0.65)
+        tips.push(
+          "Try placing your notes close to the camera and glancing toward the lens while speaking. Looking away to think is normal.",
+        );
+      if (v.framing !== null && v.framing < 0.75)
+        tips.push(
+          "Center your head and shoulders with a little space above your head.",
+        );
+      if (v.facialMovement !== null && v.facialMovement < 0.008)
+        tips.push(
+          "Practice a relaxed greeting and let facial movement follow your explanation naturally. You do not need to perform a particular expression.",
+        );
+      $("#r-delivery").insertAdjacentHTML(
+        "afterend",
+        '<section class="block card" id="r-camera"><span class="eyebrow">ON-CAMERA PRACTICE</span><h3>Eye line & facial movement</h3><p class="hint">Private landmark estimates from ' +
+          v.seconds +
+          " seconds of your turns. Camera-facing direction approximates an eye line; it is not actual eye contact. Facial movement does not measure emotion or confidence.</p>" +
+          (!v.sufficient
+            ? "<p>Not enough camera samples for reliable coaching. Try a longer response with good lighting.</p>"
+            : '<div class="stats"><div class="stat"><b>' +
+              pct(v.faceVisible) +
+              '</b><span>face visible</span></div><div class="stat"><b>' +
+              pct(v.cameraFacing) +
+              '</b><span>approximately camera-facing</span></div><div class="stat"><b>' +
+              pct(v.framing) +
+              "</b><span>comfortable framing</span></div></div><p>Facial movement: " +
+              (v.facialMovement === null
+                ? "not measured"
+                : v.facialMovement < 0.008
+                  ? "little change observed"
+                  : v.facialMovement > 0.08
+                    ? "frequent movement observed"
+                    : "some movement observed") +
+              ".</p>" +
+              listHtml(
+                tips.length
+                  ? tips
+                  : [
+                      "Keep practicing a comfortable camera position and a natural speaking style.",
+                    ],
+              )) +
+          "</section>",
+      );
+    }
     if (!report.feedback.coding) return;
     const f = report.feedback.coding;
     $("#r-delivery .stat b").textContent = "—";
@@ -727,7 +882,7 @@ export function createFeatures(ctx) {
       ]
         .map(
           ([label, score]) =>
-            `<div class="stat"><b>${report.demo ? "—" : Math.round(score)}</b><span>${label}</span></div>`,
+            `<div class="stat"><b>${report.demo || score === null ? "—" : Math.round(score)}</b><span>${label}</span></div>`,
         )
         .join(
           "",
@@ -901,6 +1056,7 @@ export function createFeatures(ctx) {
     },
     async beforeInterview(fd) {
       stopCamera();
+      coach.reset();
       if (
         fd.get("interviewStyle") === "video" &&
         fd.get("enableCamera") === "true"
@@ -916,27 +1072,54 @@ export function createFeatures(ctx) {
       $("#view-interview .call").classList.toggle("video-mode", video);
       participants.classList.toggle("hidden", !video);
       $("#camera-btn").classList.toggle("hidden", !video);
-      $("#avatar-video").innerHTML = avatarSvg($("#gender").value);
+      videoAvatar?.dispose();
+      if (video)
+        videoAvatar = createAvatar3D($("#avatar-video"), $("#gender").value);
       $("#mute-btn").textContent = "Mute microphone";
       $("#mute-btn").classList.toggle("hidden", !state.config?.elevenlabs);
     },
     mouth(value) {
-      document
-        .querySelectorAll(".avatar-mouth")
-        .forEach((mouth) =>
-          mouth.setAttribute(
-            "ry",
-            String(3 + Math.min(1, Math.max(0, value)) * 9),
-          ),
-        );
+      videoAvatar?.mouth(value);
+      codeAvatar?.mouth(value);
     },
     speaking(on) {
-      if (!on) this.mouth(0);
-      document
-        .querySelectorAll(".interviewer-avatar")
-        .forEach((el) => el.classList.toggle("is-speaking", on));
+      videoAvatar?.speaking(on);
+      codeAvatar?.speaking(on);
+    },
+    cameraSummary: () => coach.summary(),
+    async startTechnical(fd, demo) {
+      if (
+        fd.get("focus") !== "technical" ||
+        $("#technical-format").value !== "coding"
+      )
+        return false;
+      show("coding");
+      if (
+        !demo &&
+        !fd.get("resumeFile")?.size &&
+        !fd.get("resumeText")?.trim()
+      ) {
+        show("setup");
+        $("#setup-error").textContent =
+          "Add your resume as a file or pasted text first.";
+        return true;
+      }
+      if (!demo && !fd.get("jobUrl")?.trim() && !fd.get("jobText")?.trim()) {
+        show("setup");
+        $("#setup-error").textContent =
+          "Add a job link or paste the job description first.";
+        return true;
+      }
+      await startCoding(demo, demo ? null : fd);
+      return true;
     },
     stopCamera,
+    stop: () => {
+      codeMic.stop();
+      stopCamera();
+      videoAvatar?.dispose();
+      codeAvatar?.dispose();
+    },
     isActive: () => !!coding || codingBusy,
     account,
     progress,

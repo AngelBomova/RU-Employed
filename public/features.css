@@ -2,6 +2,48 @@
   font-size: 12px;
   padding: 7px 14px;
 }
+.human-avatar {
+  position: relative;
+  overflow: hidden;
+}
+.human-avatar canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+#coding-avatar {
+  width: 112px;
+  height: 132px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+#recovery-panel {
+  padding: 28px;
+  margin-bottom: 22px;
+}
+#recovery-code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 18px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  user-select: all;
+}
+#technical-format-label {
+  margin-top: 18px;
+}
+.mic.muted {
+  background: var(--surface-2);
+  color: var(--bad);
+}
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 20px;
+  color: var(--forest);
+  text-align: center;
+}
 .camera-consent {
   display: flex;
   gap: 10px;
@@ -201,9 +243,9 @@ pre {
   gap: 14px;
 }
 #coding-avatar {
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
+  width: 112px;
+  height: 132px;
+  border-radius: 14px;
   overflow: hidden;
   flex-shrink: 0;
 }

@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 process.env.OPENAI_API_KEY = "test-openai-key";
 process.env.SUPABASE_URL = "";
 process.env.SUPABASE_ANON_KEY = "";
+process.env.AUTH_MODE = "local";
+process.env.LOCAL_DATABASE_PATH = ":memory:";
 process.env.JUDGE0_API_URL = "https://judge.test";
 const originalFetch = globalThis.fetch;
 let submissionCount = 0,
@@ -120,6 +122,11 @@ before(async () => {
   server = app.listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${server.address().port}`;
+  await post("/api/auth/signup", {
+    email: "coding@example.com",
+    name: "Candidate",
+    password: "coding-fixture-password",
+  });
 });
 after(async () => {
   await new Promise((r) => server.close(r));
@@ -197,7 +204,7 @@ test("all four language IDs use sandbox limits and return compilation diagnostic
   process.env.JUDGE0_API_URL = "";
   await assert.rejects(
     executeCode("code", "python", [problem.tests[0]]),
-    (error) => error.status === 503 && /never executed/.test(error.message),
+    (error) => error.status === 503 && /Judge0/.test(error.message),
   );
 });
 test("guest session identifiers are not sufficient to read or mutate another browser interview", async () => {

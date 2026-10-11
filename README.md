@@ -1,4 +1,4 @@
-# RU Employed?
+# RU Employed
 
 **A voice-first AI mock interviewer built from your resume, your LinkedIn and the real job posting.** HackRU project.
 
@@ -18,23 +18,23 @@ The interface uses a cream and forest-green workspace with a voice visualization
 - **Candidate setup:** upload a resume, add a LinkedIn export or pasted experience, and optionally supply a portfolio URL or project descriptions. Add a public job link or paste the description. Choose behavioral, technical, or mixed practice, 4/6/9 questions, a male/female interviewer, and voice or face-to-face practice. General technical sessions cover spoken reasoning and design; the separate Coding room supports programming exercises.
 - **Live interview:** speak with the mic button, or type. See the current question, elapsed time, and transcript. Repeat a question or skip its audio without adding duplicate transcript entries.
 - **Personal report:** overall score, per-answer STAR analysis, wording improvements, delivery signals, role alignment, and a concrete practice plan. Use **Try this again** to record or type a revised answer and get fresh feedback while the server session remains active.
-- **Practice history:** guest reports save in this browser (last 12). Signed-in reports, transcripts, scores and extracted experience save privately in Supabase. View or delete reports. Live scores are summarized separately from demo indicators.
+- **Practice history:** guest reports save in this browser (last 12). Signed-in reports, transcripts, scores and extracted experience save privately in the local SQLite database, or Supabase when configured. View or delete reports. Live scores are summarized separately from demo indicators.
 - **Try a demo:** a four-question simulation using a fictional Rutgers student, sample projects, and a fictional employer, Brightside. No API keys are needed. Browser speech reads the questions; answers are typed unless ElevenLabs is configured. Demo feedback uses clearly labeled keyword checks, not an AI evaluation.
 
 ### New practice spaces
 
-- **Face-to-face:** a split-screen local webcam preview and male/female illustrated avatar. ElevenLabs playback drives mouth animation; camera and microphone controls remain available. Turning off the camera does not interrupt the interview. No video is uploaded or analyzed.
-- **Coding room:** select a company style, position and difficulty. OpenAI generates representative problems, Monaco supports Python/Java/C++/JavaScript, and Judge0 executes code in a separate sandbox. Discuss your current code by voice or text and receive contextual follow-ups and correctness/efficiency/reasoning feedback. Changed code invalidates previous execution evidence. Demos and unconfigured services are labeled explicitly.
-- **Your account:** Supabase email/password signup, confirmation, persistent login, logout, emailed recovery, account settings and private saved experience. Configure Supabase and its email templates before using these flows.
+- **Face-to-face:** a split-screen local webcam preview and animated 3D human interviewer. ElevenLabs playback drives mouth animation; camera and microphone controls remain available. Turning off the camera does not interrupt the interview. Optional webcam coaching analyzes landmarks on this device; no video is uploaded.
+- **Coding room:** select a company style, position and difficulty. OpenAI generates representative problems, Monaco supports Python/Java/C++/JavaScript, and JavaScript runs in the included isolated QuickJS sandbox. Judge0 supports Python, Java and C++ execution. Discuss your current code by voice or text and receive contextual follow-ups and correctness/efficiency/reasoning feedback. Changed code invalidates previous execution evidence. Demos and unconfigured services are labeled explicitly.
+- **Your account:** Local SQLite signup, persistent login, logout, one-time recovery-code password resets, account settings and private saved experience work without external services. Supabase remains an optional cloud account backend. Save your recovery code at signup.
 - **Your progress:** interactive Chart.js lines, week/month/90-day/all-time filters, category metrics, practice hours, comparable attempts and report links. Demos are excluded, unassessed categories remain gaps, and comparisons match interview type/focus and rubric version.
 
 ### Production setup
 
-See [the deployment guide](docs/DEPLOYMENT.md) for Supabase SQL/email configuration, Judge0, Render/Docker, HTTPS, logging and the `ruemployed.io` registration/DNS steps. New variables are documented in [.env.example](.env.example). No domain or paid hosting has been purchased. Accounts and execution stay visibly unavailable until their services are configured.
+See [the deployment guide](docs/DEPLOYMENT.md) for Supabase SQL/email configuration, Judge0, Render/Docker, HTTPS, logging and the `ruemployed.io` registration/DNS steps. New variables are documented in [.env.example](.env.example). No domain or paid hosting has been purchased. Local accounts and JavaScript execution work without external database or runner configuration. See [local features and controls](docs/LOCAL_FEATURES.md) for recovery codes, continuous microphone input and camera coaching.
 
 ### Feedback limits
 
-Speaking pace and pauses come from ElevenLabs word timestamps. Filler counts and hedging come from the transcript. Tone and confidence are inferred from those signals and wording; pitch, volume, eye contact, and facial expressions are not measured. Typed responses receive wording and structure feedback only. Offline simulations do not perform AI correctness grading; live coding reports distinguish observed executions from static assessment.
+Speaking pace and pauses come from ElevenLabs word timestamps. Filler counts and hedging come from the transcript. Tone and confidence are inferred from those signals and wording; pitch and volume are not measured. Optional local camera landmarks estimate camera-facing direction, framing, face visibility and facial movement; these do not measure emotion, true eye contact or confidence. Typed responses receive wording and structure feedback only. Offline simulations do not perform AI correctness grading; live coding reports distinguish observed executions from static assessment.
 
 ### Validation
 
@@ -69,7 +69,7 @@ Job URL ─────┘                                  │
 
 ## Run it
 
-Requires Node 20+; Node 22 LTS is recommended. If `.env` already exists, keep it and add only the new variables.
+Requires Node 22.13 or newer (built-in SQLite). If `.env` already exists, keep it and add only the new variables.
 
 ```bash
 npm install
@@ -79,7 +79,7 @@ npm start              # → http://localhost:3000
 
 Open it in Chrome, Edge or Safari, allow microphone access, and use headphones so the interviewer's voice doesn't bleed into your mic.
 
-- **Answering:** tap the mic (or press <kbd>Space</kbd>), speak, then tap again when you're done. You can also type an answer at any point.
+- **Answering:** the mic stays on and sends your answer after a 1.8-second pause. Tap the mic (or press <kbd>Space</kbd>) to mute/unmute. You can also type an answer.
 - **No ElevenLabs key?** The app still runs. The interviewer uses the browser's built-in voice and you type your answers.
 - **LinkedIn:** on your profile, choose _More → Save to PDF_ and upload that file. You can also paste the sections in.
 - **Job posting:** paste a link. If the page needs a login or JavaScript to load, paste the text instead.
@@ -92,8 +92,10 @@ lib/ingest.js       PDF + job-page text extraction
 lib/ai.js           Interview planner, live interviewer, feedback grader (Claude or OpenAI)
 lib/elevenlabs.js   TTS streaming + Scribe transcription
 lib/delivery.js     Pace / pause / filler / hedge / ownership metrics
-lib/auth.js         Supabase Auth and server-side persistent cookies
-lib/store.js        Private cloud reports and active-session leases
+lib/auth.js         Local/Supabase Auth and server-side persistent cookies
+lib/local-db.js     SQLite accounts, recovery codes and private data
+lib/local-runner.js Isolated JavaScript VM worker
+lib/store.js        Private local/cloud reports and active-session leases
 lib/coding.js       OpenAI coding interviews and Judge0 integration
 lib/progress.js     Versioned rubric and saved performance metrics
 public/             Interview UI, avatar, Monaco and progress dashboard
@@ -104,7 +106,7 @@ test/               Unit tests (npm test)
 
 ## Notes
 
-- Active sessions expire after 3 hours. Authenticated sessions persist in Supabase with request leases; guest/demo sessions use isolated process memory. Production requires Supabase and an HTTPS origin. See the deployment guide for shared rate limiting and scaling considerations.
+- Active sessions expire after 3 hours. Authenticated sessions persist in SQLite or Supabase with request leases; guest sessions use isolated process memory. Production requires an HTTPS origin and either Supabase or explicit local mode with a persistent database path. See the deployment guide for shared rate limiting and scaling considerations.
 - A transcript doesn't capture vocal pitch, so "tone" is inferred from pacing, pauses, fillers, hedging and word choice. The report says this.
 - On Claude, requests use the server-side refusal fallback (`fallbacks: "default"`), so a false-positive safety decline doesn't end an interview partway through.
 - **Keys stay private:** `.env` (and an `env/` folder, if you prefer to keep it there) are in `.gitignore`, so they never get committed.

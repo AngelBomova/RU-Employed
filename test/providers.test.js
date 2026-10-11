@@ -5,6 +5,8 @@ import { analyzeDelivery } from "../lib/delivery.js";
 
 // Exercise actual SDK parsing and HTTP integration without paid API calls.
 const originalFetch = globalThis.fetch;
+process.env.AUTH_MODE = "local";
+process.env.LOCAL_DATABASE_PATH = ":memory:";
 process.env.AI_PROVIDER = "openai";
 process.env.OPENAI_API_KEY = "test-openai-key";
 process.env.ELEVENLABS_API_KEY = "test-elevenlabs-key";
@@ -110,6 +112,18 @@ before(async () => {
   server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
+  const response = await originalFetch(base + "/api/auth/signup", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email: "provider@example.com",
+      password: "provider-fixture-password",
+    }),
+  });
+  cookie = response.headers
+    .getSetCookie()
+    .map((s) => s.split(";")[0])
+    .join("; ");
 });
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
@@ -130,7 +144,19 @@ async function post(path, values, audio = false) {
     body,
   });
   const incoming = response.headers.getSetCookie();
-  if (incoming.length) cookie = incoming.map((s) => s.split(";")[0]).join("; ");
+  if (incoming.length) {
+    const jar = new Map(
+      cookie
+        .split("; ")
+        .filter(Boolean)
+        .map((s) => s.split("=")),
+    );
+    for (const header of incoming) {
+      const [key, value] = header.split(";")[0].split("=");
+      jar.set(key, value);
+    }
+    cookie = [...jar].map(([k, v]) => k + "=" + v).join("; ");
+  }
   return { status: response.status, data: await response.json() };
 }
 

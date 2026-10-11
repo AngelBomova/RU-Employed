@@ -1,4 +1,5 @@
 import { createFeatures } from "./features.js";
+import { createContinuousMic } from "./continuous-mic.js";
 const $ = (selector) => document.querySelector(selector);
 const esc = (s) =>
   String(s ?? "").replace(
@@ -91,6 +92,7 @@ async function api(path, options = {}) {
   return response;
 }
 function releaseMic() {
+  continuousMic.stop();
   state.stream?.getTracks().forEach((t) => t.stop());
   state.stream = null;
 }
@@ -208,6 +210,7 @@ async function startInterview(demo) {
       "Sign in to start a private interview and save your progress.",
     );
   }
+  if (await features.startTechnical(fd, demo)) return;
   if (demo) {
     // The demo uses a fictional sample profile; personal inputs are not sent.
     for (const key of [
@@ -242,6 +245,7 @@ async function startInterview(demo) {
   state.ended = false;
   state.answers = 0;
   state.pendingAnswer = null;
+  state.finishAfterAnswer = false;
   state.report = null;
   $("#start-btn").disabled = $("#demo-btn").disabled = true;
   audio.unlock();
@@ -275,6 +279,8 @@ async function startInterview(demo) {
     state.demo = data.demo;
     state.busy = false;
     enterCall();
+    if (state.stream && state.config.elevenlabs)
+      await continuousMic.start(state.stream);
     await interviewerSays(data.reply);
   } catch (error) {
     releaseMic();
@@ -441,11 +447,24 @@ function setStatus(text, mode = "") {
 }
 function updateControls() {
   const blocked = state.busy || state.speaking || state.ended;
-  $("#mic-btn").disabled =
-    blocked || !state.stream?.getAudioTracks().some((t) => t.enabled);
+  $("#mic-btn").disabled = !state.stream || state.ended;
+  $("#mic-btn").setAttribute(
+    "aria-label",
+    state.muted ? "Unmute microphone" : "Mute microphone",
+  );
+  $("#mic-btn").setAttribute("aria-pressed", String(!!state.muted));
+  $("#mic-btn").classList.toggle("muted", !!state.muted);
+  $("#mute-btn").textContent = state.muted
+    ? "Unmute microphone"
+    : "Mute microphone";
+  $("#mic-hint").textContent = !state.stream
+    ? "Microphone unavailable. Type your answer below."
+    : state.muted
+      ? "Microphone muted. Tap to unmute."
+      : "Microphone stays on. Pause to send your answer; tap to mute.";
   $("#type-form button").disabled = blocked || state.recording;
   $("#type-input").disabled = state.busy || state.recording || state.ended;
-  $("#end-btn").disabled = state.busy || state.recording;
+  $("#end-btn").disabled = state.busy;
   $("#replay-btn").disabled = state.busy || state.recording || state.ended;
   $("#toggle-type").disabled = state.recording || state.busy;
   $("#replay-btn").innerHTML =
@@ -469,6 +488,7 @@ async function interviewerSays(text, repeat = false) {
   state.lastReply = text;
   if (!repeat) addBubble("interviewer", text);
   $("#caption").textContent = text;
+  continuousMic.pause();
   state.speaking = true;
   setStatus(`${state.plan.interviewer.name} is speaking…`, "speaking");
   updateControls();
@@ -523,64 +543,22 @@ function pickMime() {
     ].find((type) => MediaRecorder.isTypeSupported(type)) || ""
   );
 }
-function startRecording() {
-  if (
-    !state.stream?.getAudioTracks().some((t) => t.enabled) ||
-    state.busy ||
-    state.speaking ||
-    state.ended
-  )
-    return;
-  try {
-    const chunks = [],
-      mime = pickMime(),
-      thinkTimeMs = Date.now() - (state.questionEndedAt || Date.now());
-    const recorder = new MediaRecorder(
-      state.stream,
-      mime ? { mimeType: mime } : {},
+function toggleMute() {
+  if (!state.stream)
+    return toast("Microphone access is unavailable. You can type your answer.");
+  state.muted = continuousMic.toggleMute();
+  updateControls();
+  if (!state.speaking && !state.busy)
+    setStatus(
+      state.muted
+        ? "Microphone muted."
+        : "Listening continuously… pause to send your answer.",
+      "listening",
     );
-    state.recorder = recorder;
-    state.recording = true;
-    recorder.ondataavailable = (e) => {
-      if (e.data.size) chunks.push(e.data);
-    };
-    recorder.onstop = () => {
-      audio.stop();
-      state.recording = false;
-      $("#mic-btn").classList.remove("recording");
-      $("#mic-btn").setAttribute("aria-label", "Start answering");
-      const type = recorder.mimeType || "audio/webm";
-      const fd = new FormData();
-      fd.append(
-        "audio",
-        new Blob(chunks, { type }),
-        `answer.${type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm"}`,
-      );
-      fd.append("thinkTimeMs", String(thinkTimeMs));
-      submitAnswer(fd);
-    };
-    recorder.onerror = () => {
-      state.recording = false;
-      audio.stop();
-      $("#mic-btn").classList.remove("recording");
-      setStatus("Recording failed. Try again or type your answer.");
-      updateControls();
-    };
-    recorder.start(250);
-    audio.showMic(state.stream);
-    $("#mic-btn").classList.add("recording");
-    $("#mic-btn").setAttribute("aria-label", "Stop and send your answer");
-    $("#mic-hint").textContent = "Recording… tap again to send your answer.";
-    setStatus("Listening to your story…", "listening");
-    updateControls();
-  } catch (error) {
-    state.recording = false;
-    toast(error.message);
-    updateControls();
-  }
 }
 async function submitAnswer(fd) {
   if (state.busy || state.ended) return;
+  continuousMic.pause();
   state.busy = true;
   state.pendingAnswer = fd;
   updateControls();
@@ -609,9 +587,10 @@ async function submitAnswer(fd) {
     );
     if (fd.has("text")) $("#type-input").value = "";
     state.busy = false;
-    $("#mic-hint").textContent =
-      "Tap the mic to begin. Tap again when you’re done.";
-    await interviewerSays(data.reply);
+    if (state.finishAfterAnswer) {
+      state.finishAfterAnswer = false;
+      await finishCall();
+    } else await interviewerSays(data.reply);
   } catch (error) {
     state.busy = false;
     setStatus(
@@ -621,7 +600,12 @@ async function submitAnswer(fd) {
   }
 }
 async function finishCall() {
-  if (state.busy || state.recording) return;
+  if (state.busy) return;
+  if (state.recording) {
+    state.finishAfterAnswer = true;
+    continuousMic.flush();
+    return;
+  }
   features.stopCamera();
   if (!state.answers) {
     stopSpeech();
@@ -644,7 +628,11 @@ async function finishCall() {
     : "Reviewing your answers, delivery, and fit for the role. This may take a minute.";
   try {
     const data = await (
-      await api(`/api/sessions/${state.sessionId}/feedback`, { method: "POST" })
+      await api(`/api/sessions/${state.sessionId}/feedback`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ camera: features.cameraSummary() }),
+      })
     ).json();
     state.report = {
       ...data,
@@ -955,8 +943,7 @@ document.addEventListener("click", async (e) => {
   if (e.target.closest("#print-report")) window.print();
 });
 $("#mic-btn").addEventListener("click", () => {
-  if (state.recording) state.recorder.stop();
-  else startRecording();
+  toggleMute();
 });
 $("#type-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -988,8 +975,7 @@ document.addEventListener("keydown", (e) => {
     return;
   if ($("#mic-btn").disabled) return;
   e.preventDefault();
-  if (state.recording) state.recorder.stop();
-  else startRecording();
+  toggleMute();
 });
 $("#toggle-type").addEventListener("click", () => {
   const visible = $("#type-form").classList.contains("hidden");
@@ -1027,7 +1013,33 @@ $("#retry-dialog").addEventListener("close", () => {
 window.addEventListener("beforeunload", () => {
   audio.interrupt();
   releaseMic();
-  features.stopCamera();
+  features.stop();
+});
+const continuousMic = createContinuousMic({
+  canListen: () =>
+    !!state.sessionId &&
+    !state.busy &&
+    !state.speaking &&
+    !state.ended &&
+    !state.pendingAnswer &&
+    $("#type-form").classList.contains("hidden"),
+  onState: ({ muted, speaking }) => {
+    state.muted = muted;
+    state.recording = speaking;
+    $("#mic-btn").classList.toggle("recording", speaking);
+    if (state.plan && $("#view-interview").classList.contains("active"))
+      updateControls();
+  },
+  onAnswer: async (blob) => {
+    const fd = new FormData();
+    fd.set(
+      "audio",
+      blob,
+      "answer." + (blob.type.includes("mp4") ? "m4a" : "webm"),
+    );
+    await submitAnswer(fd);
+  },
+  onError: (error) => toast(error.message),
 });
 const features = createFeatures({
   $,
@@ -1040,6 +1052,7 @@ const features = createFeatures({
   audio,
   getMic,
   releaseMic,
+  toggleMute,
   readHistory,
   saveReport,
   renderReport,

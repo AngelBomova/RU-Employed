@@ -23,6 +23,7 @@ import {
   authenticate,
   authRouter,
   hasDatabase,
+  authMode,
   requireUser,
 } from "./lib/auth.js";
 import {
@@ -36,6 +37,7 @@ import {
   profile,
 } from "./lib/store.js";
 import { buildReport } from "./lib/progress.js";
+import { cameraSummary } from "./lib/camera.js";
 import { codingRouter, hasRunner } from "./lib/coding.js";
 import {
   DEMO_MATERIALS,
@@ -74,6 +76,14 @@ app.use(
   express.static(path.join(__dirname, "node_modules/chart.js/dist")),
 );
 app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  "/vendor/three",
+  express.static(path.join(__dirname, "node_modules/three")),
+);
+app.use(
+  "/vendor/mediapipe",
+  express.static(path.join(__dirname, "node_modules/@mediapipe/tasks-vision")),
+);
 app.get("/healthz", (_req, res) =>
   res.json({ status: "ok", uptime: Math.round(process.uptime()) }),
 );
@@ -143,6 +153,7 @@ app.get("/api/config", (_req, res) => {
     elevenlabs: hasElevenLabs(),
     ai: aiProvider(),
     accounts: hasDatabase(),
+    authMode: authMode(),
     coding: { ai: Boolean(process.env.OPENAI_API_KEY), runner: hasRunner() },
   });
 });
@@ -209,6 +220,7 @@ app.post(
       : await planInterview(materials, {
           length: b.length,
           focus: b.focus,
+          technicalFormat: b.technicalFormat,
           interviewerName: voice.name,
           gender: voice.gender,
         });
@@ -394,6 +406,7 @@ app.post(
       session.feedback ??= session.demo
         ? demoFeedback(session)
         : await generateFeedback(session);
+      session.camera ??= cameraSummary(req.body?.camera);
       session.report ??= buildReport(session);
       const cloudSaved = await saveReport(req, session, session.report);
       await saveSession(req);
@@ -483,15 +496,13 @@ app.use((err, req, res, _next) => {
       }),
     );
   if (!res.headersSent)
-    res
-      .status(status)
-      .json({
-        error:
-          process.env.NODE_ENV === "production" && status >= 500
-            ? "A service is temporarily unavailable. Please try again."
-            : err.message || "Something went wrong.",
-        requestId: req.requestId,
-      });
+    res.status(status).json({
+      error:
+        process.env.NODE_ENV === "production" && status >= 500
+          ? "A service is temporarily unavailable. Please try again."
+          : err.message || "Something went wrong.",
+      requestId: req.requestId,
+    });
   else res.end();
 });
 
@@ -501,10 +512,13 @@ if (
 ) {
   if (
     process.env.NODE_ENV === "production" &&
-    (!hasDatabase() || !/^https:\/\//.test(process.env.PUBLIC_APP_URL || ""))
+    (!/^https:\/\//.test(process.env.PUBLIC_APP_URL || "") ||
+      (authMode() === "local" &&
+        (process.env.AUTH_MODE !== "local" ||
+          !process.env.LOCAL_DATABASE_PATH)))
   )
     throw new Error(
-      "Production requires Supabase configuration and an HTTPS PUBLIC_APP_URL. See docs/DEPLOYMENT.md.",
+      "Production requires HTTPS PUBLIC_APP_URL. SQLite hosting also requires explicit AUTH_MODE=local and LOCAL_DATABASE_PATH on a persistent volume. See docs/DEPLOYMENT.md.",
     );
   const port = Number(process.env.PORT) || 3000;
   app.listen(port, () => {

@@ -4,6 +4,10 @@
 env
 .tools
 node_modules
+.data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 test
 docs
 supabase
