@@ -18,6 +18,25 @@ import {
   hasElevenLabs,
 } from "./lib/elevenlabs.js";
 import { analyzeDelivery } from "./lib/delivery.js";
+import { securityMiddleware, rateLimit, failure } from "./lib/security.js";
+import {
+  authenticate,
+  authRouter,
+  hasDatabase,
+  requireUser,
+} from "./lib/auth.js";
+import {
+  guestIdentity,
+  createSession,
+  loadSession,
+  saveSession,
+  saveReport,
+  listReports,
+  deleteReport,
+  profile,
+} from "./lib/store.js";
+import { buildReport } from "./lib/progress.js";
+import { codingRouter, hasRunner } from "./lib/coding.js";
 import {
   DEMO_MATERIALS,
   demoPlan,
@@ -41,25 +60,72 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024 },
 });
 
+app.disable("x-powered-by");
+if (process.env.TRUST_PROXY)
+  app.set("trust proxy", Number(process.env.TRUST_PROXY));
+app.use(securityMiddleware);
 app.use(express.json({ limit: "2mb" }));
+app.use(
+  "/vendor/monaco",
+  express.static(path.join(__dirname, "node_modules/monaco-editor/min")),
+);
+app.use(
+  "/vendor/chart",
+  express.static(path.join(__dirname, "node_modules/chart.js/dist")),
+);
 app.use(express.static(path.join(__dirname, "public")));
+app.get("/healthz", (_req, res) =>
+  res.json({ status: "ok", uptime: Math.round(process.uptime()) }),
+);
+app.use("/api", (req, res, next) => {
+  const start = Date.now();
+  if (process.env.NODE_ENV === "production")
+    res.on("finish", () =>
+      console.log(
+        JSON.stringify({
+          event: "request",
+          requestId: req.requestId,
+          method: req.method,
+          path: req.path,
+          status: res.statusCode,
+          durationMs: Date.now() - start,
+        }),
+      ),
+    );
+  next();
+});
+app.use("/api", rateLimit(180), guestIdentity, authenticate);
+app.use("/api/auth", authRouter);
+app.use("/api/coding", codingRouter);
 
-// In-memory sessions — fine for a hackathon demo; swap for Redis/DB to scale.
-const sessions = new Map();
-const SESSION_TTL_MS = 3 * 60 * 60 * 1000;
-setInterval(
-  () => {
-    const cutoff = Date.now() - SESSION_TTL_MS;
-    for (const [id, s] of sessions)
-      if (s.startedAt < cutoff) sessions.delete(id);
-  },
-  10 * 60 * 1000,
-).unref();
-
-const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
+// Authenticated sessions persist in Supabase; guests use an isolated memory store.
+const wrap = (fn) => async (req, res, next) => {
+  try {
+    await fn(req, res, next);
+    await saveSession(req);
+  } catch (error) {
+    try {
+      await saveSession(req);
+    } catch {
+      console.error(
+        JSON.stringify({
+          event: "session_save_failed",
+          requestId: req.requestId,
+        }),
+      );
+    }
+    next(error);
+  }
+};
+app.use("/api/sessions/:id", (req, _res, next) =>
+  loadSession(req, req.method !== "GET" && !req.path.endsWith("/speech")).then(
+    () => next(),
+    next,
+  ),
+);
 
 function getSession(req) {
-  const s = sessions.get(req.params.id);
+  const s = req.interviewSession;
   if (!s) {
     const err = new Error(
       "Interview session not found or expired. Start a new one.",
@@ -76,6 +142,8 @@ app.get("/api/config", (_req, res) => {
     lengths: LENGTHS,
     elevenlabs: hasElevenLabs(),
     ai: aiProvider(),
+    accounts: hasDatabase(),
+    coding: { ai: Boolean(process.env.OPENAI_API_KEY), runner: hasRunner() },
   });
 });
 
@@ -89,6 +157,14 @@ app.post(
   wrap(async (req, res) => {
     const b = req.body;
     const demo = b.demo === "true";
+    if (!demo && (hasDatabase() || process.env.NODE_ENV === "production"))
+      requireUser(req);
+    const voice =
+      VOICES.find(
+        (v) => v.id === b.voiceId && (!b.gender || v.gender === b.gender),
+      ) ||
+      VOICES.find((v) => v.gender === b.gender) ||
+      VOICES[0];
     const fileText = async (field) => {
       const f = req.files?.[field]?.[0];
       if (!f) return "";
@@ -130,12 +206,20 @@ app.post(
     };
     const plan = demo
       ? demoPlan({ length: b.length, focus: b.focus })
-      : await planInterview(materials, { length: b.length, focus: b.focus });
+      : await planInterview(materials, {
+          length: b.length,
+          focus: b.focus,
+          interviewerName: voice.name,
+          gender: voice.gender,
+        });
+    plan.interviewer.name = voice.name;
 
     const session = {
       id: randomUUID(),
       startedAt: Date.now(),
-      voiceId: b.voiceId,
+      voiceId: voice.id,
+      gender: voice.gender,
+      focus: ["behavioral", "technical"].includes(b.focus) ? b.focus : "mixed",
       materials,
       plan,
       messages: [], // append-only Claude conversation
@@ -150,11 +234,12 @@ app.post(
       : await interviewerTurn(session, null);
     session.currentQuestion = opening.question_id;
     session.turns.push({ role: "interviewer", text: opening.say });
-    sessions.set(session.id, session);
+    await createSession(req, session);
 
     res.json({
       id: session.id,
       demo,
+      gender: voice.gender,
       question_id: opening.question_id,
       plan: {
         company: plan.company,
@@ -165,6 +250,31 @@ app.post(
       },
       reply: opening.say,
     });
+  }),
+);
+app.get(
+  "/api/reports",
+  wrap(async (req, res) => res.json({ reports: await listReports(req) })),
+);
+app.delete(
+  "/api/reports/:id",
+  wrap(async (req, res) => {
+    await deleteReport(req, req.params.id);
+    res.json({ ok: true });
+  }),
+);
+app.get(
+  "/api/profile",
+  wrap(async (req, res) => res.json({ materials: await profile(req) })),
+);
+app.put(
+  "/api/profile",
+  wrap(async (req, res) => {
+    const materials = {};
+    for (const key of ["resume", "linkedin", "portfolio", "job", "notes"])
+      materials[key] = clean(req.body[key]);
+    await profile(req, materials);
+    res.json({ ok: true });
   }),
 );
 
@@ -197,12 +307,10 @@ app.post(
         words = result.words;
       }
       if (!text)
-        return res
-          .status(400)
-          .json({
-            error:
-              "We couldn't hear an answer. Please record again or type your response.",
-          });
+        return res.status(400).json({
+          error:
+            "We couldn't hear an answer. Please record again or type your response.",
+        });
       const metrics = analyzeDelivery(
         text,
         words,
@@ -218,6 +326,7 @@ app.post(
       session.turns.push({ role: "interviewer", text: next.say });
       session.currentQuestion = next.question_id;
       if (next.end_interview) session.ended = true;
+      await saveSession(req);
 
       res.json({
         transcript: text,
@@ -247,19 +356,23 @@ app.post(
 );
 
 // 4) End early (candidate hangs up).
-app.post("/api/sessions/:id/end", (req, res, next) => {
-  try {
-    const session = getSession(req);
-    if (session.busy)
-      return res
-        .status(409)
-        .json({ error: "Wait for your answer to finish before ending." });
-    session.ended = true;
-    res.json({ ok: true });
-  } catch (e) {
-    next(e);
-  }
-});
+app.post(
+  "/api/sessions/:id/end",
+  wrap(async (req, res, next) => {
+    try {
+      const session = getSession(req);
+      if (session.busy)
+        return res
+          .status(409)
+          .json({ error: "Wait for your answer to finish before ending." });
+      session.ended = true;
+      await saveSession(req);
+      res.json({ ok: true });
+    } catch (e) {
+      next(e);
+    }
+  }),
+);
 
 // 5) Feedback report.
 app.post(
@@ -267,17 +380,13 @@ app.post(
   wrap(async (req, res) => {
     const session = getSession(req);
     if (session.busy)
-      return res
-        .status(409)
-        .json({
-          error: "Wait for your answer to finish before requesting feedback.",
-        });
+      return res.status(409).json({
+        error: "Wait for your answer to finish before requesting feedback.",
+      });
     if (!session.turns.some((t) => t.role === "candidate" && t.text)) {
-      return res
-        .status(400)
-        .json({
-          error: "Answer at least one question before asking for feedback.",
-        });
+      return res.status(400).json({
+        error: "Answer at least one question before asking for feedback.",
+      });
     }
     session.ended = true;
     session.busy = true;
@@ -285,17 +394,10 @@ app.post(
       session.feedback ??= session.demo
         ? demoFeedback(session)
         : await generateFeedback(session);
-      res.json({
-        feedback: session.feedback,
-        demo: session.demo,
-        sessionId: session.id,
-        transcript: session.turns,
-        plan: {
-          company: session.plan.company,
-          role: session.plan.role,
-          interviewer: session.plan.interviewer,
-        },
-      });
+      session.report ??= buildReport(session);
+      const cloudSaved = await saveReport(req, session, session.report);
+      await saveSession(req);
+      res.json({ ...session.report, cloudSaved });
     } finally {
       session.busy = false;
     }
@@ -309,11 +411,9 @@ app.post(
   wrap(async (req, res) => {
     const session = getSession(req);
     if (!session.feedback)
-      return res
-        .status(409)
-        .json({
-          error: "Finish your interview before practicing an answer again.",
-        });
+      return res.status(409).json({
+        error: "Finish your interview before practicing an answer again.",
+      });
     if (session.busy)
       return res
         .status(409)
@@ -371,11 +471,27 @@ app.post(
   }),
 );
 
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   const status = err.status && err.status < 600 ? err.status : 500;
-  if (status >= 500) console.error(err);
+  if (status >= 500)
+    console.error(
+      JSON.stringify({
+        event: "request_failed",
+        requestId: req.requestId,
+        status,
+        kind: err.name,
+      }),
+    );
   if (!res.headersSent)
-    res.status(status).json({ error: err.message || "Something went wrong." });
+    res
+      .status(status)
+      .json({
+        error:
+          process.env.NODE_ENV === "production" && status >= 500
+            ? "A service is temporarily unavailable. Please try again."
+            : err.message || "Something went wrong.",
+        requestId: req.requestId,
+      });
   else res.end();
 });
 
@@ -383,6 +499,13 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!hasDatabase() || !/^https:\/\//.test(process.env.PUBLIC_APP_URL || ""))
+  )
+    throw new Error(
+      "Production requires Supabase configuration and an HTTPS PUBLIC_APP_URL. See docs/DEPLOYMENT.md.",
+    );
   const port = Number(process.env.PORT) || 3000;
   app.listen(port, () => {
     console.log(`RU Employed running → http://localhost:${port}`);

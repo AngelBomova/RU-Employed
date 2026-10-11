@@ -1,0 +1,26 @@
+# Import this blueprint only after approving any charges shown by Render.
+services:
+  - type: web
+    name: ru-employed
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: PUBLIC_APP_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: JUDGE0_API_URL
+        sync: false
+      - key: JUDGE0_API_KEY
+        sync: false

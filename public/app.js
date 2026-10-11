@@ -1,3 +1,4 @@
+import { createFeatures } from "./features.js";
 const $ = (selector) => document.querySelector(selector);
 const esc = (s) =>
   String(s ?? "").replace(
@@ -39,6 +40,8 @@ const state = {
   retryRecording: null,
   retryBusy: false,
   speechGeneration: 0,
+  user: null,
+  cloudReports: [],
 };
 
 function toast(message) {
@@ -67,8 +70,13 @@ function show(view) {
     report: "Your feedback",
     history: "Practice history",
     guide: "Coaching playbook",
+    coding: "Coding room",
+    progress: "Your progress",
+    account: "Your account",
   }[view];
   if (view === "history") renderHistory();
+  if (view === "progress") features.progress();
+  if (view === "account") features.account();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 async function api(path, options = {}) {
@@ -161,6 +169,7 @@ async function init() {
       $("#keys-warning").innerHTML = notes.join(" ");
       $("#keys-warning").classList.remove("hidden");
     }
+    await features.init(state.config);
   } catch {
     $("#keys-warning").textContent =
       "The interview server is unavailable. Start the project server to begin a session.";
@@ -193,6 +202,12 @@ async function startInterview(demo) {
     return ($("#setup-error").textContent =
       "The server is unavailable. Start it and refresh this page.");
   const fd = new FormData($("#setup-form"));
+  if (!demo && state.config.accounts && !state.user) {
+    show("account");
+    return toast(
+      "Sign in to start a private interview and save your progress.",
+    );
+  }
   if (demo) {
     // The demo uses a fictional sample profile; personal inputs are not sent.
     for (const key of [
@@ -230,6 +245,7 @@ async function startInterview(demo) {
   state.report = null;
   $("#start-btn").disabled = $("#demo-btn").disabled = true;
   audio.unlock();
+  await features.beforeInterview(fd);
   if (state.config.elevenlabs) {
     try {
       await getMic();
@@ -262,6 +278,7 @@ async function startInterview(demo) {
     await interviewerSays(data.reply);
   } catch (error) {
     releaseMic();
+    features.stopCamera();
     show("setup");
     $("#setup-error").textContent = error.message;
   } finally {
@@ -298,6 +315,11 @@ const audio = (() => {
     const bins = new Uint8Array(analyser.frequencyBinCount);
     const loop = () => {
       analyser.getByteFrequencyData(bins);
+      features.mouth(
+        analyser === playbackAnalyser
+          ? bins.reduce((a, b) => a + b, 0) / bins.length / 120
+          : 0,
+      );
       pen.clearRect(0, 0, 240, 240);
       for (let i = 0; i < 64; i++) {
         const value = bins[Math.floor((i / 64) * bins.length * 0.7)] / 255,
@@ -349,12 +371,14 @@ const audio = (() => {
       return new Promise((resolve) => {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.02;
+        utterance.onboundary = () => features.mouth(0.6);
         utterance.onend = utterance.onerror = resolve;
         finishBrowser = resolve;
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
       }).finally(() => {
         finishBrowser = null;
+        features.mouth(0);
       });
     },
     showMic(stream) {
@@ -367,6 +391,7 @@ const audio = (() => {
       } catch {}
     },
     stop() {
+      features.mouth(0);
       cancelAnimationFrame(frame);
       pen.clearRect(0, 0, 240, 240);
       micSource?.disconnect();
@@ -383,6 +408,7 @@ const audio = (() => {
 })();
 
 function enterCall() {
+  features.enterVideo();
   $("#call-company").textContent = state.plan.company;
   $("#call-role").textContent = state.plan.role;
   $("#call-format").textContent = state.plan.format_summary;
@@ -411,10 +437,12 @@ function enterCall() {
 function setStatus(text, mode = "") {
   $("#status").textContent = text;
   $("#orb").className = `orb ${mode}`;
+  features.speaking(mode === "speaking");
 }
 function updateControls() {
   const blocked = state.busy || state.speaking || state.ended;
-  $("#mic-btn").disabled = blocked || !state.stream;
+  $("#mic-btn").disabled =
+    blocked || !state.stream?.getAudioTracks().some((t) => t.enabled);
   $("#type-form button").disabled = blocked || state.recording;
   $("#type-input").disabled = state.busy || state.recording || state.ended;
   $("#end-btn").disabled = state.busy || state.recording;
@@ -496,7 +524,13 @@ function pickMime() {
   );
 }
 function startRecording() {
-  if (!state.stream || state.busy || state.speaking || state.ended) return;
+  if (
+    !state.stream?.getAudioTracks().some((t) => t.enabled) ||
+    state.busy ||
+    state.speaking ||
+    state.ended
+  )
+    return;
   try {
     const chunks = [],
       mime = pickMime(),
@@ -588,6 +622,7 @@ async function submitAnswer(fd) {
 }
 async function finishCall() {
   if (state.busy || state.recording) return;
+  features.stopCamera();
   if (!state.answers) {
     stopSpeech();
     clearInterval(state.timer);
@@ -613,8 +648,8 @@ async function finishCall() {
     ).json();
     state.report = {
       ...data,
-      id: state.sessionId,
-      createdAt: new Date().toISOString(),
+      id: data.id || state.sessionId,
+      createdAt: data.createdAt || new Date().toISOString(),
     };
     saveReport(state.report);
     renderReport(state.report);
@@ -665,6 +700,7 @@ const signals = {
 };
 function renderReport(data) {
   state.report = data;
+  // Coding-specific feedback is inserted after the shared report is rendered.
   const f = data.feedback,
     plan = data.plan,
     d = deliveryTotals(data.transcript),
@@ -681,9 +717,11 @@ function renderReport(data) {
       .join(
         "",
       )}</ol></section><section class="block card"><h3>Keep the conversation going.</h3>${list(f.practice_questions.map((q) => `${q.question} — ${q.why}`))}</section><section class="block card" id="r-transcript"><h3>Your full conversation</h3><div class="transcript">${data.transcript.map((t) => `<div class="bubble ${t.role === "candidate" ? "candidate" : "interviewer"}">${esc(t.text)}<small>${t.role === "candidate" ? "You" : esc(plan.interviewer.name)}</small></div>`).join("")}</div></section><div class="report-actions"><button class="btn" id="print-report">Save as PDF</button><button class="btn" data-view="history">Practice history</button><button class="btn primary" data-view="setup">Practice again ${icon("arrow")}</button></div></div>`;
+  features.enhanceReport(data);
 }
 
 function readHistory() {
+  if (state.user) return state.cloudReports;
   try {
     const data = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
     return Array.isArray(data)
@@ -702,6 +740,14 @@ function readHistory() {
   }
 }
 function saveReport(report) {
+  if (state.user) {
+    state.cloudReports = [
+      report,
+      ...state.cloudReports.filter((r) => r.id !== report.id),
+    ];
+    updateHistoryCount();
+    return;
+  }
   try {
     localStorage.setItem(
       HISTORY_KEY,
@@ -851,12 +897,13 @@ async function submitRetry(e) {
   }
 }
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const view = e.target.closest("[data-view]");
   if (view) {
     if (
       state.busy ||
       state.recording ||
+      features.isActive() ||
       ($("#view-interview").classList.contains("active") && !state.report)
     )
       return toast(
@@ -877,6 +924,18 @@ document.addEventListener("click", (e) => {
   const remove = e.target.closest("[data-delete]");
   if (remove) {
     try {
+      if (state.user) {
+        await api(`/api/reports/${remove.dataset.delete}`, {
+          method: "DELETE",
+        });
+        state.cloudReports = state.cloudReports.filter(
+          (r) => r.id !== remove.dataset.delete,
+        );
+        renderHistory();
+        updateHistoryCount();
+        toast("Report removed from your account.");
+        return;
+      }
       localStorage.setItem(
         HISTORY_KEY,
         JSON.stringify(
@@ -968,5 +1027,22 @@ $("#retry-dialog").addEventListener("close", () => {
 window.addEventListener("beforeunload", () => {
   audio.interrupt();
   releaseMic();
+  features.stopCamera();
+});
+const features = createFeatures({
+  $,
+  esc,
+  icon,
+  state,
+  api,
+  toast,
+  show,
+  audio,
+  getMic,
+  releaseMic,
+  readHistory,
+  saveReport,
+  renderReport,
+  updateHistoryCount,
 });
 init();

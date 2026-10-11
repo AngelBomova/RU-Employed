@@ -103,7 +103,9 @@ globalThis.fetch = async (input, options) => {
 };
 
 const { app } = await import("../server.js");
-let server, base;
+let server,
+  base,
+  cookie = "";
 before(async () => {
   server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -124,8 +126,11 @@ async function post(path, values, audio = false) {
     );
   const response = await originalFetch(`${base}${path}`, {
     method: "POST",
+    headers: { cookie },
     body,
   });
+  const incoming = response.headers.getSetCookie();
+  if (incoming.length) cookie = incoming.map((s) => s.split(";")[0]).join("; ");
   return { status: response.status, data: await response.json() };
 }
 
@@ -147,7 +152,7 @@ test("live OpenAI planning, ElevenLabs audio, failed-turn recovery, feedback, an
 
   const speech = await originalFetch(`${base}${path}/speech`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", cookie },
     body: JSON.stringify({ text: created.data.reply }),
   });
   assert.equal(speech.headers.get("content-type"), "audio/mpeg");

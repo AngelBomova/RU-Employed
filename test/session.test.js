@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { app } from "../server.js";
 import { demoPlan } from "../lib/demo.js";
 
-let server, base;
+let server,
+  base,
+  cookie = "";
 before(async () => {
   server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -13,7 +15,13 @@ after(() => new Promise((resolve) => server.close(resolve)));
 async function post(path, values) {
   const body = new FormData();
   for (const [key, value] of Object.entries(values || {})) body.set(key, value);
-  const response = await fetch(`${base}${path}`, { method: "POST", body });
+  const response = await fetch(`${base}${path}`, {
+    method: "POST",
+    body,
+    headers: { cookie },
+  });
+  const incoming = response.headers.getSetCookie();
+  if (incoming.length) cookie = incoming.map((s) => s.split(";")[0]).join("; ");
   return { status: response.status, data: await response.json() };
 }
 
