@@ -68,7 +68,7 @@ Job URL ─────┘                                  │
 | Frontend                                     | Vanilla HTML/CSS/JS with a Web Audio voice visualizer and MediaRecorder                                                                             |
 
 ## Run it
-
+Run it with the instructions below:
 Requires Node 22.13 or newer (built-in SQLite). If `.env` already exists, keep it and add only the new variables.
 
 ```bash
