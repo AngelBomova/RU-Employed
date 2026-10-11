@@ -120,6 +120,11 @@ select:focus-visible {
   flex-direction: column;
   padding: 30px 21px;
   z-index: 20;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.sidebar > * {
+  flex-shrink: 0;
 }
 .brand {
   display: flex;
@@ -210,12 +215,17 @@ select:focus-visible {
   border-radius: 5px;
 }
 .sidebar-note {
-  margin: 55px 3px 30px;
+  margin: 32px 3px 24px;
   border-radius: 14px;
   padding: 22px 17px;
   background: #f5f6f0;
   position: relative;
   overflow: hidden;
+  isolation: isolate;
+}
+.sidebar-note > * {
+  position: relative;
+  z-index: 1;
 }
 .sidebar-note:after {
   content: "";
@@ -229,6 +239,8 @@ select:focus-visible {
   box-shadow:
     0 0 0 18px #f0f3e9,
     0 0 0 19px #e8eddf;
+  z-index: 0;
+  pointer-events: none;
 }
 .note-icon {
   width: 31px;
@@ -243,6 +255,8 @@ select:focus-visible {
 .sidebar-note h3 {
   font-size: 14px;
   line-height: 1.5;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 .sidebar-note p {
   font-size: 11px;
@@ -255,9 +269,12 @@ select:focus-visible {
   font-weight: 700;
   letter-spacing: 1.5px;
   color: #748559;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 .sidebar-note > span > span {
-  padding-left: 27px;
   font-size: 14px;
 }
 .sidebar-bottom {
@@ -2146,6 +2163,10 @@ dialog h2 {
     flex-direction: row;
     align-items: center;
     gap: 15px;
+    overflow: visible;
+  }
+  .sidebar > * {
+    flex-shrink: 1;
   }
   .brand {
     font-size: 19px;

@@ -20,11 +20,11 @@ export function createAvatar3D(container, gender = "female") {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 20);
   const person = new THREE.Group();
   scene.add(person);
-  scene.add(new THREE.HemisphereLight(0xfff7ee, 0x798d82, 0.9));
-  const key = new THREE.DirectionalLight(0xfff4e6, 1.8);
+  scene.add(new THREE.HemisphereLight(0xfff8f0, 0x62656c, 0.65));
+  const key = new THREE.DirectionalLight(0xfff2e5, 1.8);
   key.position.set(-2, 3, 4);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xe9f1ff, 0.7);
+  const fill = new THREE.DirectionalLight(0xe9f1ff, 0.5);
   fill.position.set(3, 2, 2);
   scene.add(fill);
 
@@ -91,8 +91,8 @@ export function createAvatar3D(container, gender = "female") {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 0.9;
     renderer.domElement.setAttribute(
       "aria-label",
       `Animated 3D ${gender === "male" ? "male" : "female"} interviewer`,
@@ -103,7 +103,7 @@ export function createAvatar3D(container, gender = "female") {
     const generator = new THREE.PMREMGenerator(renderer);
     environment = generator.fromScene(room, 0.04);
     scene.environment = environment.texture;
-    scene.environmentIntensity = 0.65;
+    scene.environmentIntensity = 0.45;
     generator.dispose();
     room.dispose();
     observer = new ResizeObserver(fitPortrait);
@@ -111,6 +111,12 @@ export function createAvatar3D(container, gender = "female") {
     fitPortrait();
 
     const loader = new GLTFLoader();
+    // Decode embedded textures as images. This works with img-src blob: even
+    // when an older running server restricts fetch/connect-src to 'self'.
+    loader.register((parser) => {
+      parser.textureLoader = new THREE.TextureLoader(parser.options.manager);
+      return { name: "RU_local_avatar_textures" };
+    });
     loader
       .loadAsync(`/assets/${gender === "male" ? "male" : "rachel"}.glb`)
       .then((asset) => {
@@ -121,6 +127,22 @@ export function createAvatar3D(container, gender = "female") {
         model = asset.scene;
         person.add(model);
         model.traverse((mesh) => {
+          for (const material of [mesh.material].flat().filter(Boolean)) {
+            // Preserve the photographed skin, hair and clothing maps; a light
+            // skin tint and softer highlights keep faces from looking chalky.
+            if (material.map) {
+              material.map.colorSpace = THREE.SRGBColorSpace;
+              material.map.anisotropy = Math.min(
+                4,
+                renderer.capabilities.getMaxAnisotropy(),
+              );
+            }
+            if (material.name.endsWith("_head")) {
+              material.color.set(gender === "male" ? "#efd5c3" : "#f5d9c7");
+              material.roughness = 0.62;
+              material.normalScale?.set(0.55, 0.55);
+            }
+          }
           if (!mesh.morphTargetDictionary) return;
           const targets = {};
           for (const [name, index] of Object.entries(
